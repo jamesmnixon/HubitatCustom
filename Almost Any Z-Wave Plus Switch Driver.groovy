@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (white-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.1] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.2] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -141,7 +141,17 @@ void configure() {
 	if (txtEnable) log.info "Device ${device.displayName}: Configuration complete."
 }
 
-synchronized void initialize( )
+@Field static  ConcurrentHashMap initializationState = new ConcurrentHashMap<String, Boolean>(128)
+
+Boolean getIsInitialized() {
+	return initializationState.get(device.deviceNetworkId, false)
+}
+
+void setInitializedState(Boolean newState) {
+	initializationState.put(device.deviceNetworkId, newState)
+}
+
+synchronized Boolean initialize( )
 {
 	if (txtEnable) log.info "Device ${device.displayName}: Performing startup initialization routine."
     
@@ -164,9 +174,9 @@ synchronized void initialize( )
     
 	if (txtEnable) log.info "Device ${device.displayName}: Getting input controls for device."
 		getInputControlsForDevice()
-    
+		
 	// if (txtEnable) log.info "Device ${device.displayName}: Getting parameter values from device."
-	// setInputControlsToDeviceValue()
+		// setInputControlsToDeviceValue()
 	
 	if (txtEnable) log.info "Device ${device.displayName}: Getting central scene button count."
 		getCentralSceneButtonCount()
@@ -175,7 +185,9 @@ synchronized void initialize( )
 	    refresh()    
     
 	if (txtEnable) log.info "Device ${device.displayName}: Initialization complete."
-
+	
+	setInitializedState( true )
+	return true
 }
 
 void refresh()
@@ -978,6 +990,10 @@ List getOpenSmartHouseData()
 	}
 
     state.deviceInformation = "<a href=\"https://www.opensmarthouse.org/zwavedatabase/${thisDeviceData?.id}/\" target=\"_blank\" >Click Here to get your Device Info.</a>"
+	
+	state.model = thisDeviceData.label
+	state.manufacturer = thisDeviceData.manufacturer_name
+	
 	deviceDataPageLinks.put(firmwareKey(), state.deviceInformation)
     String queryByDatabaseID= "http://www.opensmarthouse.org/dmxConnect/api/zwavedatabase/device/read.php?device_id=${thisDeviceData.id}"    
     
@@ -1049,6 +1065,8 @@ void logsOff(){
 
 void updated()
 {
+	if (! getIsInitialized() ) initialize()
+	
 	if (txtEnable) log.info "Device ${device.displayName}: Updating changed parameters (if any) . . ."
 	if (logEnable) runIn(1800,logsOff)
 	
@@ -1070,6 +1088,8 @@ void updated()
 	state.pendingChanges = pendingChanges
 	processPendingChanges()
 	state.pendingChanges = pendingChanges
+	if (txtEnable) log.info "Device ${device.displayName}: Done updating changed parameters (if any) . . ."
+
 }
 
 void processPendingChanges()
@@ -1133,6 +1153,21 @@ Map<Short, BigInteger> getParameterValuesFromInputControls()
 		{ PKey , PData -> 
 			BigInteger newValue = 0
 			// if the setting returns an array, then it is a bitmap control, and add together the values.
+			
+			/*
+			if (settings.get(PData.name as String).is ( null ) )
+			{
+				log.warn "Device ${device.displayName} missing paramter value for parameter ${PKey}."
+				sendToDevice(zwave.configurationV1.configurationGet(parameterNumber: PKey as Short))
+				hubitat.zwave.Command report = myReportQueue("7006").poll(10, TimeUnit.SECONDS)
+				if (report) {
+					newValue = (report.size == 1) ? report.configurationValue[0] : report.scaledConfigurationValue			
+					if (newValue < 0) log.warn "Device ${device.displayName}: Negative configuration value reported for configuration paramater ${k}."
+					settings.put(PData.name as String, newValue)					
+					// if (report) parameterValues.put(report.parameterNumber, newValue )
+				}
+			}
+			*/
 			if (settings.get(PData.name as String) instanceof ArrayList) {
 				settings.get(PData.name as String).each{ newValue += it as BigInteger }
 			} else  {   
@@ -1195,6 +1230,8 @@ Map<Short, BigInteger> getParameterValuesFromDevice(Map options = [useCache: tru
 @Field static ConcurrentHashMap<String, Boolean> alreadyRetrievedParameters = new ConcurrentHashMap<String,Boolean>(128)
 void setInputControlsToDeviceValue()
 {
+	if (! getIsInitialized() ) initialize()
+	
 	Boolean alreadyRetrieved = alreadyRetrievedParameters.get(device.deviceNetworkId, false )
 	
 	if (alreadyRetrieved) return
@@ -1475,7 +1512,11 @@ hubitat.zwave.Command  getCachedMultiChannelCapabilityReport(Short ep)  {
 hubitat.zwave.Command  getCachedCentralSceneSupportedReport() { 
 								getReportCachedByProductId(zwave.centralSceneV3.centralSceneSupportedGet(), null ) 
 							}
-								
+
+hubitat.zwave.Command  getCachedManufacturerSpecificReport() { 
+								getReportCachedByProductId(zwave.manufacturerSpecificV1.manufacturerSpecificGet(), null ) 
+							}
+							
 hubitat.zwave.Command  getCachedMeterSupportedReport(Short ep = null ) { 
 								if (implementsZwaveClass(0x32, ep) < 2) return null
 								getReportCachedByProductId(zwave.meterV5.meterSupportedGet(), ep) 
@@ -1509,7 +1550,8 @@ void preCacheReports()
 		getCachedMeterSupportedReport()																		
 		getCachedProtectionSupportedReport()										
 		getCachedSwitchMultilevelSupportedReport()				
-		getCachedSensorMultilevelSupportedSensorReport()	
+		getCachedSensorMultilevelSupportedSensorReport()
+		getCachedManufacturerSpecificReport()		
 		
 		if (implementsZwaveClass(0x60))
 		{
@@ -1646,7 +1688,7 @@ hubitat.zwave.Command   getReportCachedByNetworkId(Map options = [:], hubitat.zw
 }
 
 
-hubitat.zwave.Command   getReportCachedByProductId(Map options = [:], hubitat.zwave.Command getCmd, Short ep)  
+hubitat.zwave.Command   getReportCachedByProductId(Map options = [:], hubitat.zwave.Command getCmd, Short ep )  
 {
 	if (!implementsZwaveClass(getCmd.commandClassId, ep)) {
 			return null
@@ -1696,6 +1738,7 @@ void logStoredReportCache()
 /////////////////  Caching Functions To return Reports! //////////////////////////////
 
 void zwaveEvent(hubitat.zwave.commands.centralscenev3.CentralSceneSupportedReport  cmd, Short ep = null )  				{ transferReport(cmd, ep) }
+void zwaveEvent(hubitat.zwave.commands.manufacturerspecificv1.ManufacturerSpecificReport  cmd, Short ep = null )  				{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.meterv5.MeterSupportedReport cmd, Short ep = null ) 								{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.multichannelv4.MultiChannelEndPointReport  cmd, Short ep = null )  				{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationSupportedReport cmd, Short ep = null )    	 			{ transferReport(cmd, ep) }
@@ -1885,6 +1928,7 @@ return [
 	0x63:1,	// User Code
 	0x6C:1,	// Supervision
 	0x71:8, // Notification
+	0x72: 1, // Manufacturer Specific
 	0x80:1, // Battery
 	0x86:3,	// Version
 	0x98:1,	// Security
