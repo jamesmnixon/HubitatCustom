@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (white-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.2] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.3] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -861,8 +861,32 @@ void getCentralSceneButtonCount() {
 	}
 }
 
+void doubleTap(button)
+{
+	multiTap(button, 2)	
+}
+void push(button)
+{
+	multiTap(button, 1)
+}
+void hold(button)
+{
+    sendEvent(name:"held", value:button, type:"digital", isStateChange:true )		
+}
+
+void release(button)
+{
+    sendEvent(name:"released", value:button, type:"digital", isStateChange:true )		
+}
 
 void multiTap(button, taps) {
+	if (taps == 1) {
+	    sendEvent(name:"pushed", value:button, type:"digital", isStateChange:true )	
+
+	} else if (taps == 2) {
+		sendEvent(name:"doubleTapped", value:button, type:"digital", isStateChange:true )	
+	}
+	
     sendEvent(name:"multiTapButton", value:("${button}.${taps}" as Float), type:"physical", unit:"Button #.Tap Count", isStateChange:true )		
 }
 
