@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.5] Almost Any Dimmer Z-wave Plus Dimmer Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.6] Almost Any Dimmer Z-wave Plus Dimmer Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -1463,7 +1463,7 @@ void createChildDevices()
 				childDriver = "Generic Component Dimmer"
 			}
 
-			addChildDevice("hubitat", childDriver, childNetworkId, [name: "${device.displayName}-ep${thisKid}", isComponent: false])
+			addChildDevice("hubitat", childDriver ?: "Generic Component Dimmer", childNetworkId, [name: "${device.displayName}-ep${thisKid}", isComponent: false])
 		} else {
 			log.info "Device ${device.displayName}: Child device with network id ${childNetworkId} already exist. No need to re-create."
 		}
