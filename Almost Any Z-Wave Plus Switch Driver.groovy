@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.4] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.5] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -1904,7 +1904,11 @@ void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionGet cmd, Short e
     hubitat.zwave.Command encapsulatedCommand = cmd.encapsulatedCommand(defaultParseMap)
 	
     if (encapsulatedCommand) {
-        zwaveEvent(encapsulatedCommand, ep)
+		if ( ep ) {
+			zwaveEvent(encapsulatedCommand, ep)
+		} else {
+			zwaveEvent(encapsulatedCommand)
+		}
     }
     sendToDevice((new hubitat.zwave.commands.supervisionv1.SupervisionReport(sessionID: cmd.sessionID, reserved: 0, moreStatusUpdates: false, status: 0xFF, duration: 0)), ep)
 }
