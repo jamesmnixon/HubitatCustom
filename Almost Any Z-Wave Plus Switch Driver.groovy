@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.6] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.7] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -829,8 +829,6 @@ void stopLevelChange(cd = null ){
 
 }
 
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////                  Central Scene Processing          ////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -1074,18 +1072,14 @@ Map createInputControls(data)
 	return inputControls
 }
 
-
 void logsOff(){
     log.warn "Device ${device.displayName}: debug logging disabled..."
     device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////      Handle Update(), and Set, Get, and Process Parameter Values       ////////
 /////////////////////////////////////////////////////////////////////////////////////// 
-
-
 
 void updated()
 {
@@ -1126,10 +1120,6 @@ void processPendingChanges()
 void setParameter(parameterNumber,value) {
 	setParameter(parameterNumber:parameterNumber, value:value)
 }
-
-
-
-
 
 BigInteger setParameter(Map params = [parameterNumber: null , value: null ] ){
     if (params.parameterNumber.is( null ) || params.value.is( null ) ) {
@@ -1238,6 +1228,7 @@ Map<Short, BigInteger> getParameterValuesFromDevice(Map options = [useCache: tru
 		hubitat.zwave.Command report = null
 		inputs.each 
 			{ k, v ->
+				if (logEnable) log.debug "Device ${device.displayName}: Sending to device a configuration get for parameter #: ${k}"
 				sendToDevice(zwave.configurationV1.configurationGet(parameterNumber: k as Short))
 				report = myReportQueue("7006").poll(10, TimeUnit.SECONDS)
 				if (! report) return
@@ -1462,6 +1453,8 @@ void createChildDevices()
 			} else  if (implementsZwaveClass(0x26, thisKid ) ){ // MultiLevel Switch
 				childDriver = "Generic Component Dimmer"
 			}
+			
+			if (childDriver.is( null ) ) log.warn "Device ${device.displayName}: Child driver is null. Setting up as a dimmer"
 
 			addChildDevice("hubitat", childDriver ?: "Generic Component Dimmer", childNetworkId, [name: "${device.displayName}-ep${thisKid}", isComponent: false])
 		} else {
@@ -1532,7 +1525,15 @@ hubitat.zwave.Command  getCachedMultiChannelEndPointReport() {
 hubitat.zwave.Command  getCachedMultiChannelCapabilityReport(Short ep)  { 
 								getReportCachedByProductId(zwave.multiChannelV4.multiChannelCapabilityGet(endPoint: ep), null )
 							}
-								
+
+hubitat.zwave.Command  getCachedSecurity2CommandsSupportedReport(Short ep)  { 
+								if ( (getDataValue("zwaveSecurePairingComplete") as Boolean) == true )
+								{
+									// This code assumes all security is S2. This should be more precise!
+									return getReportCachedByProductId(zwave.security2V1.security2CommandsSupportedGet(), ep )
+								} else return null
+							}
+							
 hubitat.zwave.Command  getCachedCentralSceneSupportedReport() { 
 								getReportCachedByProductId(zwave.centralSceneV3.centralSceneSupportedGet(), null ) 
 							}
@@ -1771,6 +1772,8 @@ void zwaveEvent(hubitat.zwave.commands.protectionv2.ProtectionSupportedReport  c
 void zwaveEvent(hubitat.zwave.commands.switchmultilevelv4.SwitchMultilevelSupportedReport  cmd, Short ep = null )   		{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.sensormultilevelv11.SensorMultilevelSupportedSensorReport  cmd, Short ep = null ) 	{ transferReport(cmd, ep) }		
 void zwaveEvent(hubitat.zwave.commands.versionv3.VersionReport cmd, Short ep = null )  									{ transferReport(cmd, ep) }
+void zwaveEvent(hubitat.zwave.commands.security2v1.Security2CommandsSupportedReport cmd, Short ep = null )  			{ transferReport(cmd, ep) }
+
 Boolean transferReport(cmd, ep)
 { 	
 	Boolean transferredReport = myReportQueue(cmd.CMD).offer([report:cmd, endPoint:ep])
@@ -1832,6 +1835,8 @@ Integer implementsZwaveClass(Short commandClass, Short ep = null )
 		if (supportsEndpoints && (ep <= numberOfEndPoints))
 		{
 			if (getCachedMultiChannelCapabilityReport(ep)?.commandClass.contains(commandClass)) {
+				return getCachedVersionCommandClassReport(commandClass)?.commandClassVersion
+			} else if (getCachedSecurity2CommandsSupportedReport(ep)?.commandClasses.contains(commandClass)) {
 				return getCachedVersionCommandClassReport(commandClass)?.commandClassVersion
 			} else {
 				return null
