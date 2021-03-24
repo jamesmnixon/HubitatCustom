@@ -1,5 +1,9 @@
 # HubitatCustom
 
+## Known Problems
+
+There are a number of problems with devices that have endpoints and which have been included using S2 security. I'll get them fixed, but it may take a little bit of time . . .
+
 ## Current Plans . . .
 Feb. 23, 2021: Update - Code has been reworked with a focuse on better Endpoint handling and improved concurrency handling.  Next significant updates will be after Hubitat release 2.2.6
 
