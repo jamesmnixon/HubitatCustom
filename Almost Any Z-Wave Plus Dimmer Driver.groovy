@@ -36,6 +36,9 @@ metadata {
 					]	
 		
 		command "resetState"
+		
+		// command "identify" // This is an experimental function
+		// command "getHubitatSupportedZwaveClasses" // This is a debug function. log.debug's the list of zwave classes supported by Hubitat.
         
     }
 	
@@ -61,6 +64,34 @@ metadata {
 			keyset?.sort().each{ input inputs.get(it) }
         }
     }	
+}
+
+// Debug Function
+void getHubitatSupportedZwaveClasses()
+{
+    log.debug "Properties are: " + zwave.properties.sort{it.key}.collect{it}.findAll{!['class', 'active'].contains(it.key)}.join('\n')
+}
+
+// Experimental
+
+void identify()
+{
+	hubitat.zwave.Command  report = getCachedZwaveplusInfoReport()
+	log.debug "ZwavePlusInfoReport is: " + report
+
+	// Performs the identify function if supported by the device.
+	if (implementsZwaveClass(0x87) > 1)
+	{
+		List<Map<String, Short>> indicators = [
+		[indicatorId:0x50, propertyId:0x03, value:0x08], 
+		[indicatorId:0x50, propertyId:0x04, value:0x03],  
+		[indicatorId:0x50, propertyId:0x05, value:0x06]
+		]
+		sendToDevice(secure(zwave.indicatorV3.indicatorSet(indicatorCount:3 , value:0, indicatorValues: indicators )))
+
+	} else {
+		log.warn "The indicator class isn't supported by this device so the identify() function will have no effect."
+	}	
 }
 
 ///////////////////////////////////////////////////////////////////////
