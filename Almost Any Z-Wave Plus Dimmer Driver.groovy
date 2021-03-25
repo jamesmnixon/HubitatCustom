@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.7] Almost Any Dimmer Z-wave Plus Dimmer Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.8] Almost Any Dimmer Z-wave Plus Dimmer Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -37,19 +37,6 @@ metadata {
 		
 		command "resetState"
         
-        // Following commands are for debugging purposes
-		// command "indicatorSupportedGet", [[name:"indicatorId",type:"NUMBER", description:"indicatorId Number", constraints:["NUMBER"]]]	
-		// command "preCacheReports"
-		// command "getCachedVersionReport"
-		// command "getCachedNotificationSupportedReport"
-		// command "getCachedMultiChannelEndPointReport"
-		// command "logStoredReportCache"
-		// command "getInputControlsForDevice"
-		// command "getOpenSmartHouseData"
-		// command "getParameterValuesFromDevice"
-		// command "setInputControlsToDeviceValue"
-		// command "getParameterValuesFromInputControls"
-		// command "clearLeftoverDeviceData"
     }
 	
     preferences 
@@ -1576,7 +1563,8 @@ void preCacheReports()
 		getCachedProtectionSupportedReport()										
 		getCachedSwitchMultilevelSupportedReport()				
 		getCachedSensorMultilevelSupportedSensorReport()
-		getCachedManufacturerSpecificReport()		
+		getCachedManufacturerSpecificReport()	
+		getCachedSecurity2CommandsSupportedReport()
 		
 		if (implementsZwaveClass(0x60))
 		{
@@ -1588,7 +1576,8 @@ void preCacheReports()
 				getCachedMeterSupportedReport(endPoint)																		
 				getCachedProtectionSupportedReport(endPoint)										
 				getCachedSwitchMultilevelSupportedReport(endPoint)				
-				getCachedSensorMultilevelSupportedSensorReport(endPoint)			
+				getCachedSensorMultilevelSupportedSensorReport(endPoint)
+				getCachedSecurity2CommandsSupportedReport(endPoint)				
 			}
 		}
 }
