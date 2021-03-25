@@ -69,6 +69,7 @@ metadata {
 // Debug Function
 void getHubitatSupportedZwaveClasses()
 {
+	// Sends the list of zwave classes supported by Hubitat to log.debug
     log.debug "Properties are: " + zwave.properties.sort{it.key}.collect{it}.findAll{!['class', 'active'].contains(it.key)}.join('\n')
 }
 
@@ -76,6 +77,7 @@ void getHubitatSupportedZwaveClasses()
 
 void identify()
 {
+	// Performs the identification function on Z-Wave Version 2 devices.
 	hubitat.zwave.Command  report = getCachedZwaveplusInfoReport()
 	log.debug "ZwavePlusInfoReport is: " + report
 
