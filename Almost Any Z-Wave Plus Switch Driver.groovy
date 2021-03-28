@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "[Beta 0.1.7] Almost Any Switch Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
+	definition (name: "[Beta 0.1.8] Almost Any Dimmer Z-wave Plus Switch Driver",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -36,20 +36,10 @@ metadata {
 					]	
 		
 		command "resetState"
+		
+		// command "identify" // This is an experimental function
+		// command "getHubitatSupportedZwaveClasses" // This is a debug function. log.debug's the list of zwave classes supported by Hubitat.
         
-        // Following commands are for debugging purposes
-		// command "indicatorSupportedGet", [[name:"indicatorId",type:"NUMBER", description:"indicatorId Number", constraints:["NUMBER"]]]	
-		// command "preCacheReports"
-		// command "getCachedVersionReport"
-		// command "getCachedNotificationSupportedReport"
-		// command "getCachedMultiChannelEndPointReport"
-		// command "logStoredReportCache"
-		// command "getInputControlsForDevice"
-		// command "getOpenSmartHouseData"
-		// command "getParameterValuesFromDevice"
-		// command "setInputControlsToDeviceValue"
-		// command "getParameterValuesFromInputControls"
-		// command "clearLeftoverDeviceData"
     }
 	
     preferences 
@@ -74,6 +64,36 @@ metadata {
 			keyset?.sort().each{ input inputs.get(it) }
         }
     }	
+}
+
+// Debug Function
+void getHubitatSupportedZwaveClasses()
+{
+	// Sends the list of zwave classes supported by Hubitat to log.debug
+    log.debug "Properties are: " + zwave.properties.sort{it.key}.collect{it}.findAll{!['class', 'active'].contains(it.key)}.join('\n')
+}
+
+// Experimental
+
+void identify()
+{
+	// Performs the identification function on Z-Wave Version 2 devices.
+	hubitat.zwave.Command  report = getCachedZwaveplusInfoReport()
+	log.debug "ZwavePlusInfoReport is: " + report
+
+	// Performs the identify function if supported by the device.
+	if (implementsZwaveClass(0x87) > 1)
+	{
+		List<Map<String, Short>> indicators = [
+		[indicatorId:0x50, propertyId:0x03, value:0x08], 
+		[indicatorId:0x50, propertyId:0x04, value:0x03],  
+		[indicatorId:0x50, propertyId:0x05, value:0x06]
+		]
+		sendToDevice(secure(zwave.indicatorV3.indicatorSet(indicatorCount:3 , value:0, indicatorValues: indicators )))
+
+	} else {
+		log.warn "The indicator class isn't supported by this device so the identify() function will have no effect."
+	}	
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -708,7 +728,9 @@ void zwaveEvent(hubitat.zwave.commands.switchbinaryv2.SwitchBinaryReport cmd, Sh
 	}
 }
 
-void zwaveEvent(hubitat.zwave.commands.switchmultilevelv4.SwitchMultilevelReport cmd, Short ep = null)
+void zwaveEvent(hubitat.zwave.commands.switchmultilevelv4.SwitchMultilevelReport cmd, Short ep = null) { processSwitchReport(cmd, ep) }
+void zwaveEvent(hubitat.zwave.commands.basicv2.BasicReport cmd, Short ep = null) { processSwitchReport(cmd, ep) }
+void processSwitchReport(cmd, ep)
 {
 	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
 
@@ -1576,7 +1598,8 @@ void preCacheReports()
 		getCachedProtectionSupportedReport()										
 		getCachedSwitchMultilevelSupportedReport()				
 		getCachedSensorMultilevelSupportedSensorReport()
-		getCachedManufacturerSpecificReport()		
+		getCachedManufacturerSpecificReport()	
+		getCachedSecurity2CommandsSupportedReport()
 		
 		if (implementsZwaveClass(0x60))
 		{
@@ -1588,7 +1611,8 @@ void preCacheReports()
 				getCachedMeterSupportedReport(endPoint)																		
 				getCachedProtectionSupportedReport(endPoint)										
 				getCachedSwitchMultilevelSupportedReport(endPoint)				
-				getCachedSensorMultilevelSupportedSensorReport(endPoint)			
+				getCachedSensorMultilevelSupportedSensorReport(endPoint)
+				getCachedSecurity2CommandsSupportedReport(endPoint)				
 			}
 		}
 }
