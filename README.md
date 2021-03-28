@@ -2,7 +2,7 @@
 
 ## Known Problems
 
-There are a number of problems with devices that have endpoints and which have been included using S2 security. I'll get them fixed, but it may take a little bit of time . . .
+Zen30: As of release 1.0.0, the driver does not properly support the Zen30 relay switch. I'll get it eventually!
 
 ## Current Plans . . .
 Feb. 23, 2021: Update - Code has been reworked with a focuse on better Endpoint handling and improved concurrency handling.  Next significant updates will be after Hubitat release 2.2.6
