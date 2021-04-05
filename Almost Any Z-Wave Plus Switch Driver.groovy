@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.0",namespace: "jvm", author: "jvm") {
+	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.3",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -11,18 +11,18 @@ metadata {
 		// capability "ChangeLevel"
 		// capability "WindowShade"
 		
-		capability "PowerMeter"
+		capability "EnergyMeter"
+        capability "PowerMeter"
 		capability "VoltageMeasurement"
+        capability "CurrentMeter"
+        
 		// capability "Battery"
 		
 		capability "PushableButton"
-		command "push", ["NUMBER"]	
 		capability "HoldableButton"
-		command "hold", ["NUMBER"]
 		capability "ReleasableButton"
-		command "release", ["NUMBER"]
 		capability "DoubleTapableButton"
-		command "doubleTap", ["NUMBER"]
+        
         command "multiTap", [[name:"button",type:"NUMBER", description:"Button Number", constraints:["NUMBER"]],
 					[name:"taps",type:"NUMBER", description:"Tap count", constraints:["NUMBER"]]]
 
@@ -53,8 +53,6 @@ metadata {
 			input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
 			input name: "txtEnable", type: "bool", title: "Enable text logging", defaultValue: true
 			input name: "superviseEnable", type: "bool", title: "Enable Command Supervision if supported", defaultValue: true
-			// The following preferences are only for use while debugging. Remove them from final code
-			// input name: "remindEnable", type: "bool", title: "Enable Coding To-Do Reminders", defaultValue: false
 		}
 		if (showParameterInputs)
 		{
@@ -82,7 +80,7 @@ void identify()
 	log.debug "ZwavePlusInfoReport is: " + report
 
 	// Performs the identify function if supported by the device.
-	if (implementsZwaveClass(0x87) > 1)
+	if (implementsZwaveClass(0x87) && (versionOfClass(0x87) > 1))
 	{
 		List<Map<String, Short>> indicators = [
 		[indicatorId:0x50, propertyId:0x03, value:0x08], 
@@ -134,17 +132,6 @@ void clearLeftoverDeviceData()
 {
     List<String> deleteOldJunk = ["storedFirmwareReport", "storedEndpointReport", "zwaveAssociationG1", "protocolVersion", "hardwareVersion", "firmwareVersion", "associationGroup1", "associationGroup2", "associationGroup3", "associationGroup4", "associationGroup5", "associationGroup6", "associationGroup7", "MSR"]
     deleteOldJunk.each{device.removeDataValue( it) }
-/*
-	// Clean out any old state variables left behind by other driver versions!
-	List<String> allowedDataVariables = ["deviceId", "deviceType", "manufacturer", "inClusters", "zwNodeInfo", "secureInClusters"] 
-	
-	// Can't modify data from within device.each{}, so first collect what is unwanted, then remove in a separate unwanted.each
-	List<String> unwanted = device.collect{ 
-			if (allowedDataVariables.contains( it.key as String)) return
-			return it.key
-		}
-	unwanted.each{device.removeDataValue( it ) } 
-	*/
 }
 
 void installed() { 
@@ -233,7 +220,7 @@ void refreshEndpoint(Map params = [cd: null, ep: null ])
 		targetDevice = getTargetDeviceByEndPoint(params.ep)
 	}
 	
-	if (txtEnable) log.info "Device ${targetDevice.displayName}: refresing data values"
+	if (txtEnable) log.info "Device ${targetDevice.displayName}: refreshing data values"
 	
 	if (implementsZwaveClass(0x25, ep)) { // Switch Binary Type device
 		sendToDevice(zwave.switchBinaryV1.switchBinaryGet(), ep)
@@ -259,14 +246,14 @@ void meterRefresh ( Short ep = null )
 	
 	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
 
-	if (implementsZwaveClass(0x32, ep) < 1) {
+	if (!implementsZwaveClass(0x32, ep)) {
 		log.warn "Called meterRefresh() for a Device ${targetDevice.displayName} that does not support metering. No Meter Refresh performed."
 		return
 	}
 
     if (txtEnable) log.info "Refreshing Energy Meter values for device: ${targetDevice.displayName}."
 	
-	if (implementsZwaveClass(0x32, ep) == 1)
+	if (implementsZwaveClass(0x32, ep) && (versionOfClass(0x32) == 1))
 	{
 		sendToDevice(zwave.meterV1.meterGet(), ep)
 	} else {
@@ -1535,53 +1522,62 @@ hubitat.zwave.Command  getCachedVersionReport() {
 								getReportCachedByNetworkId(zwave.versionV1.versionGet(), null )
 							}
 								
-hubitat.zwave.Command  getCachedNotificationSupportedReport(Short ep = null ) { 
-								if (implementsZwaveClass(0x71, ep) < 2) return null
-								getReportCachedByProductId(zwave.notificationV8.notificationSupportedGet(), ep)
+hubitat.zwave.Command  getCachedNotificationSupportedReport(ep = null ) { 
+								if (!implementsZwaveClass(0x71, ep)) return null
+								getReportCachedByProductId(zwave.notificationV8.notificationSupportedGet(), ep as Short)
 							}
 								
 hubitat.zwave.Command  getCachedMultiChannelEndPointReport() { 
+								if (!implementsZwaveClass(0x60)) return null
 								getReportCachedByProductId(zwave.multiChannelV4.multiChannelEndPointGet(), null )
 							}
 								
-hubitat.zwave.Command  getCachedMultiChannelCapabilityReport(Short ep)  { 
-								getReportCachedByProductId(zwave.multiChannelV4.multiChannelCapabilityGet(endPoint: ep), null )
+hubitat.zwave.Command  getCachedMultiChannelCapabilityReport(ep)  { 
+								if (!implementsZwaveClass(0x60)) return null
+								getReportCachedByProductId(zwave.multiChannelV4.multiChannelCapabilityGet(endPoint: ep as Short), null )
 							}
 
-hubitat.zwave.Command  getCachedSecurity2CommandsSupportedReport(Short ep)  { 
-								if ( (getDataValue("zwaveSecurePairingComplete") as Boolean) == true )
+hubitat.zwave.Command  getCachedSecurity2CommandsSupportedReport(ep)  { 
+								if (!implementsZwaveClass(0x60)) return null
+								if ( ((getDataValue("zwaveSecurePairingComplete") as Boolean) == true) || (getDataValue("secureInClusters")))
 								{
+									hubitat.zwave.Command  report = getReportCachedByProductId(zwave.security2V1.security2CommandsSupportedGet(), ep )
 									// This code assumes all security is S2. This should be more precise!
-									return getReportCachedByProductId(zwave.security2V1.security2CommandsSupportedGet(), ep )
+									return report
 								} else return null
 							}
 							
 hubitat.zwave.Command  getCachedCentralSceneSupportedReport() { 
+								if (!implementsZwaveClass(0x5B)) return null
 								getReportCachedByProductId(zwave.centralSceneV3.centralSceneSupportedGet(), null ) 
 							}
 
 hubitat.zwave.Command  getCachedManufacturerSpecificReport() { 
+								if (!implementsZwaveClass(0x72)) return null
 								getReportCachedByProductId(zwave.manufacturerSpecificV1.manufacturerSpecificGet(), null ) 
 							}
 							
-hubitat.zwave.Command  getCachedMeterSupportedReport(Short ep = null ) { 
-								if (implementsZwaveClass(0x32, ep) < 2) return null
-								getReportCachedByProductId(zwave.meterV5.meterSupportedGet(), ep) 
+hubitat.zwave.Command  getCachedMeterSupportedReport(ep = null ) { 
+								if (!implementsZwaveClass(0x32, ep)) return null
+								if (versionOfClass(0x32) < 2) return null
+								getReportCachedByProductId(zwave.meterV5.meterSupportedGet(), ep as Short) 
 							}
 														
-hubitat.zwave.Command  getCachedProtectionSupportedReport(Short ep = null ) { 
-								if (implementsZwaveClass(0x75, ep) < 2) return null
-								getReportCachedByProductId(zwave.protectionV2.protectionSupportedGet(), ep) 
+hubitat.zwave.Command  getCachedProtectionSupportedReport(ep = null ) { 
+								if (!implementsZwaveClass(0x75, ep)) return null
+								if (versionOfClass(0x75) < 2) return null
+								getReportCachedByProductId(zwave.protectionV2.protectionSupportedGet(), ep as Short) 
 							}
 								
-hubitat.zwave.Command  getCachedSwitchMultilevelSupportedReport(Short ep = null ) { 
-								if (implementsZwaveClass(0x26, ep) < 3) return null
-								getReportCachedByProductId(zwave.switchMultilevelV4.switchMultilevelSupportedGet(), ep) 
+hubitat.zwave.Command  getCachedSwitchMultilevelSupportedReport(ep = null ) { 
+								if (!implementsZwaveClass(0x26, ep)) return null
+								if (versionOfClass(0x26) < 3) return null
+								getReportCachedByProductId(zwave.switchMultilevelV4.switchMultilevelSupportedGet(), ep as Short) 
 							}
 
-hubitat.zwave.Command  getCachedSensorMultilevelSupportedSensorReport(Short ep = null ) { 
-								if (implementsZwaveClass(0x31, ep) < 5) return null
-								getReportCachedByProductId(zwave.sensorMultilevelV11.sensorMultilevelSupportedGetSensor(), ep) 
+hubitat.zwave.Command  getCachedSensorMultilevelSupportedSensorReport(ep = null ) { 
+								if (!implementsZwaveClass(0x31, ep)) return null
+								getReportCachedByProductId(zwave.sensorMultilevelV11.sensorMultilevelSupportedGetSensor(), ep as Short) 
 							}
 
 // =============================================
@@ -1591,7 +1587,7 @@ void preCacheReports()
 
 		List<Short> 	deviceClasses = getDataValue("inClusters")?.split(",").collect{ hexStrToUnsignedInt(it) as Short }
 						deviceClasses += getDataValue("secureInClusters")?.split(",").collect{ hexStrToUnsignedInt(it) as Short }
-		deviceClasses.each{ it ->  implementsZwaveClass(it) }
+
 		getCachedCentralSceneSupportedReport()		
 		getCachedNotificationSupportedReport()										
 		getCachedMeterSupportedReport()																		
@@ -1652,8 +1648,7 @@ String getDeviceIdHexString() { return hubitat.helper.HexUtils.integerToHexStrin
 
 String productKey() // Generates a key based on manufacturer / device / firmware. Data is shared among all similar end-devices.
 {
-	// if (remindEnable) log.warn "productKey function should be updated with a hash based on inclusters as some devices may remove change their inclusters depending on pairing state. for example, Zooz Zen 18 motion sensor may or may not show with a battery!"
-	
+
 	String key = "${getManufacturerHexString()}:${getDeviceTypeHexString()}:${getDeviceIdHexString()}:"
 	return key
 }
@@ -1726,22 +1721,20 @@ hubitat.zwave.Command   getReportCachedByNetworkId(Map options = [:], hubitat.zw
 			sendToDevice(getCmd, ep)
 			transferredData = myReportQueue(reportClass).poll(10, TimeUnit.SECONDS)
 		}
-		cmd =  transferredData.report
-		if (cmd.CMD == "8612") {
+		cmd =  transferredData?.report
+		if (cmd?.CMD == "8612") {
 				device.updateDataValue("versionReport", cmd.format())
 			}
 			
-		cacheForThisEndpoint.put(cmd.CMD, cmd)
+		if (cmd) cacheForThisEndpoint.put(cmd.CMD, cmd)
 	}
 	return cacheForThisEndpoint?.get(reportClass)
 }
 
 
-hubitat.zwave.Command   getReportCachedByProductId(Map options = [:], hubitat.zwave.Command getCmd, Short ep )  
+hubitat.zwave.Command   getReportCachedByProductId(hubitat.zwave.Command getCmd, ep )  
 {
-	if (!implementsZwaveClass(getCmd.commandClassId, ep)) {
-			return null
-		}
+	
 	Short subIndex
 	switch (getCmd.CMD)
 	{
@@ -1749,9 +1742,11 @@ hubitat.zwave.Command   getReportCachedByProductId(Map options = [:], hubitat.zw
 			subIndex = getCmd.endPoint
 			break
 		default :
-			subIndex = ep ?: 0
+			subIndex = ep.is( null ) ? 0 : (ep as Short)
 			break
 	}
+	
+
 	ConcurrentHashMap cacheForThisProductId = reportsCachedByProductId.get(firmwareKey(), new ConcurrentHashMap<String,SynchronousQueue>(64))
 	ConcurrentHashMap cacheForThisSubIndex = cacheForThisProductId?.get(subIndex, new ConcurrentHashMap<String,Object>(32) )	
 
@@ -1766,7 +1761,7 @@ hubitat.zwave.Command   getReportCachedByProductId(Map options = [:], hubitat.zw
 		while( transferredData.is ( null ) && (tries <= 3) )
 		{
 			tries++
-			sendToDevice(getCmd, ep)
+			sendToDevice(getCmd, ep as Short)
 			transferredData = myReportQueue(reportClass).poll(10, TimeUnit.SECONDS)
 		}
 		cmd =  transferredData?.report
@@ -1846,40 +1841,30 @@ List <Short> getNotificationSupportedReportsAsList(Short ep = null )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-Integer implementsZwaveClass(commandClass, Short ep = null ) {implementsZwaveClass(commandClass as Short, ep as Short )}
-Integer implementsZwaveClass(Short commandClass, Short ep = null )
+////////////////////////////////////////////////////////////////////////////////////////////////////
+Integer versionOfClass(commandClass)
+{
+	return getCachedVersionCommandClassReport(commandClass as Short)?.commandClassVersion
+}
+Boolean implementsZwaveClass(commandClass)
 {
 	List<Short> deviceClasses = getDataValue("inClusters")?.split(",").collect{ hexStrToUnsignedInt(it) as Short }
 				deviceClasses += getDataValue("secureInClusters")?.split(",").collect{ hexStrToUnsignedInt(it) as Short }
-	if (ep ) 
+	return deviceClasses.contains(commandClass as Short)
+}
+
+Boolean implementsZwaveClass(commandClass, ep)
+{
+	if( ! ep) 
 	{
-		Boolean supportsEndpoints = deviceClasses.contains(0x60 as Short)
-		Short numberOfEndPoints = getCachedMultiChannelEndPointReport().endPoints
-		
-		if (supportsEndpoints && (ep <= numberOfEndPoints))
-		{
-			if (getCachedMultiChannelCapabilityReport(ep)?.commandClass.contains(commandClass)) {
-				return getCachedVersionCommandClassReport(commandClass)?.commandClassVersion
-			} else if (getCachedSecurity2CommandsSupportedReport(ep)?.commandClasses.contains(commandClass)) {
-				return getCachedVersionCommandClassReport(commandClass)?.commandClassVersion
-			} else {
-				return null
-			}
-		} else {
-			log.warn "Device ${device.displayName}: called function implementsZwaveClass(commandClass = ${commandClass}, ep = ${ep}). Maximum endpoints supported by this device is: ${numberOfEndPoints ? numberOfEndPoints : 0}" 
-			return null
-		}
-		
-	} else  if (deviceClasses.contains(commandClass)) {
-		Integer returnClassVersion = getCachedVersionCommandClassReport(commandClass)?.commandClassVersion
-		
-		if (! returnClassVersion) { 
-				log.warn "Device ${device.displayName}: In implementsZwaveClass function, Failed to retrieve a command class version for command class ${commandClass} even though class is supported. Forcing a return of 1."
-				returnClassVersion = 1 
-			} 
-		return returnClassVersion
-	} 
-	return null
+		return implementsZwaveClass(commandClass)
+	} else if (getCachedMultiChannelCapabilityReport(ep as Short)?.commandClass?.contains(commandClass as Short)) {
+		return true
+	} else if (getCachedSecurity2CommandsSupportedReport(ep as Short)?.commandClasses.contains(commandClass as Short)) {
+		return true
+	} else {
+		return false
+	}
 }
 		
 //////////////////////////////////////////////////////////////////////
