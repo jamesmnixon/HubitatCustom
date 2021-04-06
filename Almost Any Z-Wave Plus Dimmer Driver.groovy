@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "Almost Any Dimmer Z-wave Plus Dimmer Driver v1.0.3",namespace: "jvm", author: "jvm") {
+	definition (name: "Almost Any Dimmer Z-wave Plus Dimmer Driver v1.0.4",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -187,6 +187,11 @@ synchronized Boolean initialize( )
 	
 	if (txtEnable) log.info "Device ${device.displayName}: Getting central scene button count."
 		getCentralSceneButtonCount()
+		
+	if (superviseEnable)
+	{
+		sendInitialCommand()
+	}
 	
 	if (txtEnable) log.info "Device ${device.displayName}: Refreshing device data."
 	    refresh()    
@@ -195,6 +200,31 @@ synchronized Boolean initialize( )
 	
 	setInitializedState( true )
 	return true
+}
+
+// When the driver starts up, the first sessionID for supervision is a random value 1-32
+// But this has about a 3% chance of using the same sessionID as was last sent to the switch, causing devices to not respond the first time
+// That a command is sent, so when starting, send the last value twice to 'prime' the sessionID
+void sendInitialCommand()
+{
+	if (device.hasAttribute("switch") && (device.currentValue("switch") == "off")) {
+		sendZwaveValue(value: 0 )
+		sendZwaveValue(value: 0 )
+		return
+	} 
+		
+	if ( device.hasAttribute("switch") && (device.currentValue("switch") == "on")) {
+		if (device.hasAttribute("level")) { 
+			sendZwaveValue(value: (device.currentValue("level") as Integer ))
+			sendZwaveValue(value: (device.currentValue("level") as Integer ))
+			return		
+		} else {
+			sendZwaveValue(value: 255)
+			sendZwaveValue(value: 255)
+			return
+		}
+	}
+
 }
 
 void refresh()
