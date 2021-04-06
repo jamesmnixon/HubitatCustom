@@ -208,23 +208,19 @@ synchronized Boolean initialize( )
 void sendInitialCommand()
 {
 	if (device.hasAttribute("switch") && (device.currentValue("switch") == "off")) {
-		sendZwaveValue(value: 0 )
-		sendZwaveValue(value: 0 )
+		sendSupervised(zwave.basicV2.basicSet(value: 0 ))
 		return
 	} 
 		
 	if ( device.hasAttribute("switch") && (device.currentValue("switch") == "on")) {
 		if (device.hasAttribute("level")) { 
-			sendZwaveValue(value: (device.currentValue("level") as Integer ))
-			sendZwaveValue(value: (device.currentValue("level") as Integer ))
+			sendSupervised(zwave.basicV2.basicSet(value: (device.currentValue("level") as Integer )))
 			return		
 		} else {
-			sendZwaveValue(value: 255)
-			sendZwaveValue(value: 255)
+			sendSupervised(zwave.basicV2.basicSet(value: 99))
 			return
 		}
 	}
-
 }
 
 void refresh()
