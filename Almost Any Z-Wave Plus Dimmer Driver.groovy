@@ -190,7 +190,7 @@ synchronized Boolean initialize( )
 		
 	if (superviseEnable)
 	{
-		sendInitialCommand()
+		runIn(30, sendInitialCommand)
 	}
 	
 	if (txtEnable) log.info "Device ${device.displayName}: Refreshing device data."
