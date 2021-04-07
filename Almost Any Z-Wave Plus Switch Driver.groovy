@@ -11,10 +11,10 @@ metadata {
 		// capability "ChangeLevel"
 		// capability "WindowShade"
 		
-		capability "EnergyMeter"
-        capability "PowerMeter"
-		capability "VoltageMeasurement"
-        capability "CurrentMeter"
+		// capability "EnergyMeter"
+        // capability "PowerMeter"
+		// capability "VoltageMeasurement"
+        // capability "CurrentMeter"
         
 		// capability "Battery"
 		
