@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.4",namespace: "jvm", author: "jvm") {
+	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.5",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
