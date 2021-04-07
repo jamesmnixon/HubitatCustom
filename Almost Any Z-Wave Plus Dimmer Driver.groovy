@@ -11,10 +11,10 @@ metadata {
 		// capability "ChangeLevel"
 		// capability "WindowShade"
 		
-		// capability "EnergyMeter"
-        // capability "PowerMeter"
-		// capability "VoltageMeasurement"
-        // capability "CurrentMeter"
+		capability "EnergyMeter"
+        capability "PowerMeter"
+		capability "VoltageMeasurement"
+        capability "CurrentMeter"
         
 		// capability "Battery"
 		
@@ -1681,17 +1681,17 @@ String productKey() // Generates a key based on manufacturer / device / firmware
 
 String firmwareKey()
 {
-	hubitat.zwave.Command   versionReport = getCachedVersionReport() 
-	if (!versionReport)  {
-			log.warn "Device ${device.displayName} called firmwareKey function but firmware version is not cached! Device may not be operating correctly. Using previously stored value."
-			String versionFormatString = device.getDataValue("versionReport") 
-			if (versionFormatString)  {
-				return productKey() + versionFormatString
-			} else {
-				return null
-			}
+	String versionFormatString = device.getDataValue("versionReport") 
+	if (versionFormatString) {
+		return productKey() + versionFormatString
+	} else  {
+		hubitat.zwave.Command   versionReport = getCachedVersionReport() 
+		if (versionReport) { 
+			return productKey() + versionReport?.format() 
+		} 	else { 
+			return productKey() + "MissingVersionReport" 
 		}
-	return productKey() + versionReport?.format()
+	}
 }
 
 ///////////////////////////////////////////
