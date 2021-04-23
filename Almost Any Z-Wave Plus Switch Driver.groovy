@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.5",namespace: "jvm", author: "jvm") {
+	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.7",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -229,7 +229,7 @@ void refresh()
 	
 	hubitat.zwave.Command endPointReport = getCachedMultiChannelEndPointReport()
 
-	for (Short thisEndpoint = 1; thisEndpoint < endPointReport?.endPoints; thisEndpoint++) {
+	for (Short thisEndpoint = 1; thisEndpoint <= endPointReport?.endPoints; thisEndpoint++) {
 			refreshEndpoint(ep:thisEndpoint)
 		}
 }
@@ -286,15 +286,15 @@ void meterRefresh ( Short ep = null )
 		Map<String, Boolean> metersSupported = getElectricMeterScalesSupportedMap( ep )
 		
 		List<hubitat.zwave.Command> cmds = []
-			if (metersSupported.kWh) 			cmds << secure(zwave.meterV5.meterGet(scale: 0), ep)
-			if (metersSupported.kVAh) 			cmds << secure(zwave.meterV5.meterGet(scale: 1), ep)
-			if (metersSupported.Watts) 			cmds << secure(zwave.meterV5.meterGet(scale: 2), ep)
-			if (metersSupported.PulseCount) 	cmds << secure(zwave.meterV5.meterGet(scale: 3), ep)
-			if (metersSupported.Volts) 			cmds << secure(zwave.meterV5.meterGet(scale: 4), ep)
-			if (metersSupported.Amps) 			cmds << secure(zwave.meterV5.meterGet(scale: 5), ep)
-			if (metersSupported.PowerFactor) 	cmds << secure(zwave.meterV5.meterGet(scale: 6), ep)
-			if (metersSupported.kVar) 			cmds << secure(zwave.meterV5.meterGet(scale: 7, scale2: 0), ep)
-			if (metersSupported.kVarh) 			cmds << secure(zwave.meterV5.meterGet(scale: 7, scale2: 1), ep)
+			if (metersSupported.kWh) 			cmds << secure(zwave.meterV6.meterGet(scale: 0), ep)
+			if (metersSupported.kVAh) 			cmds << secure(zwave.meterV6.meterGet(scale: 1), ep)
+			if (metersSupported.Watts) 			cmds << secure(zwave.meterV6.meterGet(scale: 2), ep)
+			if (metersSupported.PulseCount) 	cmds << secure(zwave.meterV6.meterGet(scale: 3), ep)
+			if (metersSupported.Volts) 			cmds << secure(zwave.meterV6.meterGet(scale: 4), ep)
+			if (metersSupported.Amps) 			cmds << secure(zwave.meterV6.meterGet(scale: 5), ep)
+			if (metersSupported.PowerFactor) 	cmds << secure(zwave.meterV6.meterGet(scale: 6), ep)
+			if (metersSupported.kVar) 			cmds << secure(zwave.meterV6.meterGet(scale: 7, scale2: 0), ep)
+			if (metersSupported.kVarh) 			cmds << secure(zwave.meterV6.meterGet(scale: 7, scale2: 1), ep)
 		if (cmds) sendToDevice(cmds)	
 	}
 }
@@ -334,7 +334,7 @@ Map<String, Boolean> getElectricMeterScalesSupportedMap(Short ep = null )
 }
 
 
-void zwaveEvent(hubitat.zwave.commands.meterv5.MeterReport cmd, Short ep = null )
+void zwaveEvent(hubitat.zwave.commands.meterv6.MeterReport cmd, Short ep = null )
 {
 	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
 	
@@ -1565,6 +1565,7 @@ hubitat.zwave.Command  getCachedMultiChannelCapabilityReport(ep)  {
 
 hubitat.zwave.Command  getCachedSecurity2CommandsSupportedReport(ep)  { 
 								if (!implementsZwaveClass(0x60)) return null
+								if (!implementsZwaveClass(0x9F)) return null
 								if ( ((getDataValue("zwaveSecurePairingComplete") as Boolean) == true) || (getDataValue("secureInClusters")))
 								{
 									hubitat.zwave.Command  report = getReportCachedByProductId(zwave.security2V1.security2CommandsSupportedGet(), ep )
@@ -1572,7 +1573,16 @@ hubitat.zwave.Command  getCachedSecurity2CommandsSupportedReport(ep)  {
 									return report
 								} else return null
 							}
-							
+hubitat.zwave.Command  getCachedSecurity0CommandsSupportedReport(ep)  { 
+								if (!implementsZwaveClass(0x60)) return null
+								if (!implementsZwaveClass(0x98)) return null
+								if ( ((getDataValue("zwaveSecurePairingComplete") as Boolean) == true) || (getDataValue("secureInClusters")))
+								{
+									hubitat.zwave.Command  report = getReportCachedByProductId(zwave.securityV1.securityCommandsSupportedGet(), ep )
+									// This code assumes all security is S2. This should be more precise!
+									return report
+								} else return null
+							}							
 hubitat.zwave.Command  getCachedCentralSceneSupportedReport() { 
 								if (!implementsZwaveClass(0x5B)) return null
 								getReportCachedByProductId(zwave.centralSceneV3.centralSceneSupportedGet(), null ) 
@@ -1586,7 +1596,7 @@ hubitat.zwave.Command  getCachedManufacturerSpecificReport() {
 hubitat.zwave.Command  getCachedMeterSupportedReport(ep = null ) { 
 								if (!implementsZwaveClass(0x32, ep)) return null
 								if (versionOfClass(0x32) < 2) return null
-								getReportCachedByProductId(zwave.meterV5.meterSupportedGet(), ep as Short) 
+								getReportCachedByProductId(zwave.meterV6.meterSupportedGet(), ep as Short) 
 							}
 														
 hubitat.zwave.Command  getCachedProtectionSupportedReport(ep = null ) { 
@@ -1809,7 +1819,7 @@ void logStoredReportCache()
 
 void zwaveEvent(hubitat.zwave.commands.centralscenev3.CentralSceneSupportedReport  cmd, Short ep = null )  				{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.manufacturerspecificv1.ManufacturerSpecificReport  cmd, Short ep = null )  				{ transferReport(cmd, ep) }
-void zwaveEvent(hubitat.zwave.commands.meterv5.MeterSupportedReport cmd, Short ep = null ) 								{ transferReport(cmd, ep) }
+void zwaveEvent(hubitat.zwave.commands.meterv6.MeterSupportedReport cmd, Short ep = null ) 								{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.multichannelv4.MultiChannelEndPointReport  cmd, Short ep = null )  				{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationSupportedReport cmd, Short ep = null )    	 			{ transferReport(cmd, ep) }
 void zwaveEvent(hubitat.zwave.commands.notificationv8.EventSupportedReport cmd, Short ep = null )    	 					{ transferReport(cmd, ep) }
@@ -1886,7 +1896,7 @@ Boolean implementsZwaveClass(commandClass, ep)
 		return implementsZwaveClass(commandClass)
 	} else if (getCachedMultiChannelCapabilityReport(ep as Short)?.commandClass?.contains(commandClass as Short)) {
 		return true
-	} else if (getCachedSecurity2CommandsSupportedReport(ep as Short)?.commandClasses.contains(commandClass as Short)) {
+	} else if (getCachedSecurity2CommandsSupportedReport(ep as Short)?.commandClasses?.contains(commandClass as Short)) {
 		return true
 	} else {
 		return false
@@ -1989,7 +1999,7 @@ return [
 	0x25:2, // Switch Binary
 	0x26:4, // Switch MultiLevel 
 	0x31:11, // Sensor MultiLevel
-	0x32:5, // Meter
+	0x32:6, // Meter
 	0x5B:3,	// Central Scene
 	0x60:4,	// MultiChannel
 	0x62:1,	// Door Lock
