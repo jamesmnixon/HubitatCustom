@@ -7,6 +7,8 @@ metadata {
 		command "setRootLevel", [[name:"level",type:"NUMBER", description:"New Level", constraints:["NUMBER"]]]
 		command "setEndpoint1Level", [[name:"level",type:"NUMBER", description:"New Level", constraints:["NUMBER"]]]
 		command "setEndpoint2Level", [[name:"level",type:"NUMBER", description:"New Level", constraints:["NUMBER"]]]
+		command "getSecureEndpointClasses1"
+		command "getSecureEndpointClasses2"
     }
 	
     preferences 
@@ -14,6 +16,20 @@ metadata {
 			input name: "superviseEnable", type: "bool", title: "Enable Command Supervision if supported", defaultValue: true
     }	
 }
+void getSecureEndpointClasses1() 
+{
+	sendSupervised(zwave.security2V1.security2CommandsSupportedGet(), 1 as Short)
+
+}
+void getSecureEndpointClasses2() 
+{
+	sendSupervised(zwave.security2V1.security2CommandsSupportedGet(), 2 as Short)
+
+}
+void zwaveEvent(hubitat.zwave.commands.security2v1.Security2CommandsSupportedReport cmd, Short ep = null )  			
+	{ 
+		log.debug "For endpoint ${ep}, received Security2 report: ${cmd}" 
+	}
 
 void setRootLevel(level) 
 {
