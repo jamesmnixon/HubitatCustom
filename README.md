@@ -2,10 +2,10 @@
 
 ## Known Problems
 
-Zen30: As of release 1.0.0, the driver does not properly support the Zen30 relay switch. I'll get it eventually!
+Zen30: As of release 1.0.11, the driver does not properly support the Zen30 relay switch. I'll get it eventually!
 
 ## Current Plans . . .
-Feb. 23, 2021: Update - Code has been reworked with a focuse on better Endpoint handling and improved concurrency handling.  Next significant updates will be after Hubitat release 2.2.6
+May 1, 2021: Update - Code has been reworked with a focuse on better Supervision and S2 handling.
 
 # Advanced Zwave Plus Dimmer driver  and Switch driver- Beta Releases!
 
