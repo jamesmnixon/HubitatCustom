@@ -2,7 +2,7 @@ import java.util.concurrent.* // Available (allow-listed) concurrency classes: C
 import groovy.transform.Field
 
 metadata {
-	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.7",namespace: "jvm", author: "jvm") {
+	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.0.11",namespace: "jvm", author: "jvm") {
 		// capability "Configuration"
 		capability "Initialize"
 		capability "Refresh"
@@ -52,7 +52,7 @@ metadata {
         {
 			input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
 			input name: "txtEnable", type: "bool", title: "Enable text logging", defaultValue: true
-			input name: "superviseEnable", type: "bool", title: "Enable Command Supervision if supported", defaultValue: true
+			// input name: "superviseEnable", type: "bool", title: "Enable Command Supervision if supported", defaultValue: true
 		}
 		if (showParameterInputs)
 		{
@@ -208,16 +208,20 @@ synchronized Boolean initialize( )
 void sendInitialCommand()
 {
 	if (device.hasAttribute("switch") && (device.currentValue("switch") == "off")) {
-		sendSupervised(zwave.basicV2.basicSet(value: 0 ))
+		sendZwaveValue(value:0)
+// 		sendSupervised(zwave.basicV2.basicSet(value: 0 ))
 		return
 	} 
 		
 	if ( device.hasAttribute("switch") && (device.currentValue("switch") == "on")) {
 		if (device.hasAttribute("level")) { 
-			sendSupervised(zwave.basicV2.basicSet(value: (device.currentValue("level") as Integer )))
+			sendZwaveValue(value:(device.currentValue("level") as Integer ))
+			//sendSupervised(zwave.basicV2.basicSet(value: (device.currentValue("level") as Integer )))
 			return		
 		} else {
-			sendSupervised(zwave.basicV2.basicSet(value: 99))
+			sendZwaveValue(value:99)
+
+			// sendSupervised(zwave.basicV2.basicSet(value: 99))
 			return
 		}
 	}
@@ -498,67 +502,97 @@ void getSupportedNotificationEvents(Short ep = null )
 void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, Short ep = null )
 {
 	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+
+	if (logEnable) log.debug "Received NotificationReport: ${cmd}"
 	
-	List events =
+	Map events =
 		[ 	1:[ // Smoke
-				0:[[name:"smoke" , value:"clear", descriptionText:"Smoke detector status Idle."]], 
-				1:[[name:"smoke" , value:"detected", descriptionText:"Smoke detected (location provided)."]], 
-				2:[[name:"smoke" , value:"detected", descriptionText:"Smoke detected."]]
+				0:[	
+					1:[name:"smoke" , value:"clear", descriptionText:"Smoke detected (location provided) status Idle."],
+					2:[name:"smoke" , value:"clear", descriptionText:"Smoke detector status Idle."]
+					], 
+				1:[name:"smoke" , value:"detected", descriptionText:"Smoke detected (location provided)."], 
+				2:[name:"smoke" , value:"detected", descriptionText:"Smoke detected."]
 				],
 			2:[ // CO
-				0:[[name:"carbonMonoxide" , value:"clear", descriptionText:"Smoke detector status Idle."]], 
-				1:[[name:"carbonMonoxide" , value:"detected", descriptionText:"Smoke detected (location provided)."]], 
-				2:[[name:"carbonMonoxide" , value:"detected", descriptionText:"Smoke detected."]]
-				],
+				0:[
+					1:[name:"carbonMonoxide" , value:"clear", descriptionText:"Smoke detector status Idle."],
+					2:[name:"carbonMonoxide" , value:"clear", descriptionText:"Smoke detector status Idle."]					
+					], 
+				1:[name:"carbonMonoxide" , value:"detected", descriptionText:"Smoke detected (location provided)."], 
+				2:[name:"carbonMonoxide" , value:"detected", descriptionText:"Smoke detected."]
+				],				
 			5:[ // Water
-				0:[[name:"water" , value:"dry", descriptionText:"Water Alarm Notification, Status Dry."]], 
-				1:[[name:"water" , value:"wet", descriptionText:"Water leak detected (location provided)."]], 
-				2:[[name:"water" , value:"wet", descriptionText:"Water leak detected."]]
+				0:[
+					1:[name:"water" , value:"dry", descriptionText:"Water Alarm Notification, Status Dry."],
+					2:[name:"water" , value:"dry", descriptionText:"Water Alarm Notification, Status Dry."]
+				], 
+				1:[name:"water" , value:"wet", descriptionText:"Water leak detected (location provided)."], 
+				2:[name:"water" , value:"wet", descriptionText:"Water leak detected."]
 				],
 			6:[ // Access Control (Locks)
 				0:[], 
-				1:[[name:"lock" , value:"locked", descriptionText:"Manual lock operation"]], 
-				2:[[name:"lock" , value:"unlocked", descriptionText:"Manual unlock operation"]], 
-				3:[[name:"lock" , value:"locked", descriptionText:"RF lock operation"]], 
-				4:[[name:"lock" , value:"unlocked", descriptionText:"RF unlock operation"]], 
-				5:[[name:"lock" , value:"locked", descriptionText:"Keypad lock operation"]], 
-				6:[[name:"lock" , value:"unlocked", descriptionText:"Keypad unlock operation"]], 
-				11:[[name:"lock" , value:"unknown", descriptionText:"Lock jammed"]], 				
-				254:[[name:"lock" , value:"unknown", descriptionText:"Lock in unknown state"]]
+				1:[name:"lock" , value:"locked", descriptionText:"Manual lock operation"], 
+				2:[name:"lock" , value:"unlocked", descriptionText:"Manual unlock operation"], 
+				3:[name:"lock" , value:"locked", descriptionText:"RF lock operation"], 
+				4:[name:"lock" , value:"unlocked", descriptionText:"RF unlock operation"], 
+				5:[name:"lock" , value:"locked", descriptionText:"Keypad lock operation"], 
+				6:[name:"lock" , value:"unlocked", descriptionText:"Keypad unlock operation"], 
+				11:[name:"lock" , value:"unknown", descriptionText:"Lock jammed"], 				
+				254:[name:"lock" , value:"unknown", descriptionText:"Lock in unknown state"]
 				],
 			7:[ // Home Security
-				0:[[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."] ], 
-				3:[[name:"tamper" , value:"detected", descriptionText:"Tampering, device cover removed"]], 
-				4:[[name:"tamper" , value:"detected", descriptionText:"Tampering, invalid code."]], 
-				7:[[name:"motion" , value:"active", descriptionText:"Motion detected (location provided)."]],
-				8:[[name:"motion" , value:"active", descriptionText:"Motion detected."]],
-				9:[[name:"tamper" , value:"detected", descriptionText:"Tampering, device moved"]]
+				0:[		3:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
+						4:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
+						9:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
+						7:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
+						8:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."] 
+					], 
+				3:[name:"tamper" , value:"detected", descriptionText:"Tampering, device cover removed"], 
+				4:[name:"tamper" , value:"detected", descriptionText:"Tampering, invalid code."], 
+				7:[name:"motion" , value:"active", descriptionText:"Motion detected (location provided)."],
+				8:[name:"motion" , value:"active", descriptionText:"Motion detected."],
+				9:[name:"tamper" , value:"detected", descriptionText:"Tampering, device moved"]
 				],
 			14:[ // Siren
-				0:[[name:"alarm" , value:"off", descriptionText:"Alarm Siren Off."]], 
-				1:[[name:"alarm" , value:"siren", descriptionText:"Alarm Siren On."]]
+				0:[
+					1:[name:"alarm" , value:"off", descriptionText:"Alarm Siren Off."]
+					], 
+				1:[name:"alarm" , value:"siren", descriptionText:"Alarm Siren On."]
 				], 
 			15:[ // Water Valve
-				0:[[name:"valve" , value:( (cmd.event > 0 ) ? "open" : "closed"), descriptionText:"Valve Operation."]], 
-				1:[[name:"valve" , value:( (cmd.event > 0 ) ? "open" : "closed"), descriptionText:"Master Valve Operation."]] 
+				0:[name:"valve" , value:( (cmd.event > 0 ) ? "open" : "closed"), descriptionText:"Valve Operation."], 
+				1:[name:"valve" , value:( (cmd.event > 0 ) ? "open" : "closed"), descriptionText:"Master Valve Operation."] 
 				], 
 			22:[ // Presence
-				0:[[name:"presence" , value:"not present", descriptionText:"Home not occupied"]], 
-				1:[[name:"presence" , value:"present", descriptionText:"Home occupied (location provided)"]],  
-				2:[[name:"presence" , value:"present", descriptionText:"Home occupied"]]
+				0:[
+					1:[name:"presence" , value:"not present", descriptionText:"Home not occupied"],
+					2:[name:"presence" , value:"not present", descriptionText:"Home not occupied"]
+					], 
+				1:[name:"presence" , value:"present", descriptionText:"Home occupied (location provided)"],  
+				2:[name:"presence" , value:"present", descriptionText:"Home occupied"]
 				]
 				
 		].get(cmd.notificationType as Integer)?.get(cmd.event as Integer)
 	
 	if ( ! events ) { 
-		log.warn "Device ${device.displayName}: Received an unhandled notifiation event ${cmd} for endpoint ${ep}." 
-	} else { 
-		events?.each{ 
-			if (targetDevice.hasAttribute(it.name)) { 
-				targetDevice.sendEvent(it) 
+		log.warn "Device ${targetDevice.displayName}: Received an unhandled notifiation event ${cmd} for endpoint ${ep}." 
+	} else 
+	{ 
+	
+		if(cmd.eventParametersLength == 0)
+		{
+			if (targetDevice.hasAttribute(events.name)) { 
+				targetDevice.sendEvent(events) 
 			} else {
-				log.warn "Device ${targetDevice.displayName}: Device missing attribute for notification event ${it}, notification report: ${cmd}."
+				log.warn "Device ${device.displayName}: Device missing attribute for notification event ${it}, notification report: ${cmd}."
 			}
+			
+		} else 
+		{
+			Map clearMessage = events.get(cmd.eventParameter[0] as Integer)
+			if (logEnable) log.debug "Clearing an notification state by sending event: ${clearMessage}"
+			if (clearMessage) targetDevice.sendEvent(clearMessage)
 		}
 	}
 }
@@ -1910,46 +1944,52 @@ Boolean implementsZwaveClass(commandClass, ep)
 // @Field static results in variable being shared among all devices that use the same driver, so I use a concurrentHashMap keyed by a device's deviceNetworkId to get a unqiue value for a particular device
 // supervisionSessionIDs stores the last used sessionID value (0..31) for a device. It must be incremented mod 32 on each send
 // supervisionSentCommands stores the last command sent
+// Each is initialized for 64 devices, but can automatically grow
+@Field static ConcurrentHashMap<String, Short> supervisionSessionIDs = new ConcurrentHashMap<String, Short>(64)
+@Field static ConcurrentHashMap<String, ConcurrentHashMap> supervisionSentCommands = new ConcurrentHashMap<String, ConcurrentHashMap<Short, String>>(64)
 
-@Field static ConcurrentHashMap<String, Short> supervisionSessionIDs = new ConcurrentHashMap<String, Short>(128)
-@Field static ConcurrentHashMap<String, Short> supervisionSentCommands = new ConcurrentHashMap<String, ConcurrentHashMap<Short, hubitat.zwave.Command>>(128)
-
-// supervisionRejected is a concurrentHashMap within a concurrentHashMap. A first HashMap is retrieved using the device's firmwareKey. This means that it is shared among all devices that have the same manufacturere, device Type, device ID, and firmware version
-// That first map is then a map of all of the commands (cmd.CMD) that have been rejectefd. So, if a command is rejected as not supervisable, it doesn't get sent using supervision by any similar device
-@Field static ConcurrentHashMap<String, ConcurrentHashMap> supervisionRejected = new ConcurrentHashMap<String, ConcurrentHashMap<String, Boolean>>(128)
-
-Boolean commandSupervisionNotSupported(hubitat.zwave.Command cmd) {	
-	Boolean previouslyRejected = ( supervisionRejected.get(firmwareKey())?.get(cmd.CMD) ) ? true : false 
-	if (logEnable && previouslyRejected) log.debug "Device ${device.displayName}: Attempted to supervise a class ${cmd.CMD} which was previously rejected as not supervisable."
-	return previouslyRejected 
-}
-
-void markSupervisionNotSupported(hubitat.zwave.Command cmd) {	
-	supervisionRejected.get(firmwareKey(), new ConcurrentHashMap<String, Boolean>(32) ).put(cmd.CMD, true )
-}
-
-def supervise(hubitat.zwave.Command command)
-{
-    if (superviseEnable && (!commandSupervisionNotSupported(command)) && implementsZwaveClass(0x6C))
-	{
-		// Get the next session ID mod 32, but if there is no stored session ID, initialize it with a random value.
-		Short nextSessionID = supervisionSessionIDs.get(device.getDeviceNetworkId() as String,((Math.random() * 32) % 32) as Short )
-		nextSessionID = (nextSessionID + 1) % 32 // increment and then mod with 32
+Short getNewSessionId() {
+		// Get the next session ID mod 64, but if there is no stored session ID, initialize it with a random value.
+		Short lastSessionID = supervisionSessionIDs.get(device.getDeviceNetworkId() as String,((Math.random() * 64) % 64) as Short )
+		Short nextSessionID = (lastSessionID + 1) % 64 // increment and then mod with 64, and then store it back in the Hash table.
 		supervisionSessionIDs.replace(device.getDeviceNetworkId(), nextSessionID)
-		
-		// Store the command that is being sent so that you can log.debug it and resend in case of failure!
-		supervisionSentCommands.get(device.getDeviceNetworkId() as String, new ConcurrentHashMap<Short, hubitat.zwave.Command>(128)).put(nextSessionID, command)
+		return nextSessionID
+} 
+Boolean getSuperviseThis()
+{
+		return (getDataValue("S2")?.toInteger() != null)
+}
 
-		if (logEnable) log.debug "Supervising a command: ${command} with session ID: ${nextSessionID}."
-		return zwave.supervisionV1.supervisionGet(sessionID: nextSessionID, statusUpdates: false ).encapsulate(command)
+void sendSupervised(hubitat.zwave.Command cmd, Short ep = null ) { 
+	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+	
+	Short thisSessionId = getNewSessionId()
+	
+	ConcurrentHashMap commandStorage = supervisionSentCommands.get(device.getDeviceNetworkId() as String, new ConcurrentHashMap<Short, hubitat.zwave.Command>(64))
+	
+	def sendThisCommand = cmd // use def rather than more specific data class, as data class changes from a Hubitat Command to a String after security encapsulation
+
+	if (superviseThis)
+	{
+		sendThisCommand = zwave.supervisionV1.supervisionGet(sessionID: thisSessionId, statusUpdates: true ).encapsulate(sendThisCommand)
+		sendThisCommand = secure(sendThisCommand, ep) // Returns security and endpoint encapsulated string
+		commandStorage.put(thisSessionId, sendThisCommand)
+		sendHubCommand(new hubitat.device.HubAction( sendThisCommand, hubitat.device.Protocol.ZWAVE)) 
+		runIn(5, supervisionCheck)	
+		if (logEnable)  log.debug "Device ${targetDevice}: In sendSupervised, Sending supervised command: ${sendThisCommand}"
+
 	} else {
-		return command
+		sendThisCommand = secure(sendThisCommand, ep) // Returns security and endpoint encapsulated string
+		sendHubCommand(new hubitat.device.HubAction( sendThisCommand, hubitat.device.Protocol.ZWAVE)) 
+		if (logEnable)  log.debug "Device ${targetDevice}: In sendSupervised, Sending Un-supervised command: ${sendThisCommand}"
 	}
 }
+	
 
 // This handles a supervised message (a "get") received from the Z-Wave device //
 void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionGet cmd, Short ep = null ) {
 	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+	if (logEnable) log.debug "Device ${targetDevice.displayName}: Supervision Get - SessionID: ${cmd.sessionID}, Command Class: ${cmd.commandClassIdentifier}, Command: ${cmd.commandIdentifier}"
 	
     hubitat.zwave.Command encapsulatedCommand = cmd.encapsulatedCommand(defaultParseMap)
 	
@@ -1960,33 +2000,77 @@ void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionGet cmd, Short e
 			zwaveEvent(encapsulatedCommand)
 		}
     }
-    sendToDevice((new hubitat.zwave.commands.supervisionv1.SupervisionReport(sessionID: cmd.sessionID, reserved: 0, moreStatusUpdates: false, status: 0xFF, duration: 0)), ep)
+	
+	hubitat.zwave.Command confirmationReport = (new hubitat.zwave.commands.supervisionv1.SupervisionReport(sessionID: cmd.sessionID, reserved: 0, moreStatusUpdates: false, status: 0xFF, duration: 0))
+	
+	sendHubCommand(new hubitat.device.HubAction(secure(confirmationReport, ep), hubitat.device.Protocol.ZWAVE))
+
+}
+
+Boolean ignoreSupervisionNoSupportCode()
+{
+	// Some devices implement the Supervision command class incorrectly and return a "No Support" code even when they work.
+	// This function is to ignore the No Support code from those devices.
+	List<Map> poorSupervisionSupport = [
+			[	manufacturer:12,  	deviceType:17479,	deviceId: 12340  	], // HomeSeer WD100 S2 is buggy!
+			[	manufacturer:12,  	deviceType:17479,	deviceId: 12342  	], // HomeSeer WD200 is buggy!
+			]
+    	Map thisDevice =	poorSupervisionSupport.find{ element ->
+							((element.manufacturer == getDataValue("manufacturer")?.toInteger()) && (element.deviceId == getDataValue("deviceId")?.toInteger()) && (element.deviceType == getDataValue("deviceType")?.toInteger()))
+						}
+		return ( thisDevice ? true : false )
+						
 }
 
 void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionReport cmd, Short ep = null ) {
 	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
 	
-	hubitat.zwave.Command whatWasSent = supervisionSentCommands?.get(device.getDeviceNetworkId() as String)?.get(cmd.sessionID)
+	ConcurrentHashMap whatThisDeviceSent = supervisionSentCommands?.get(device.getDeviceNetworkId() as String)
+	
+	String whatWasSent = null
 
-	switch (cmd.status)
+	switch (cmd.status as Integer)
 	{
-		case 0x00:
-			log.warn "Device ${targetDevice.displayName}: Z-Wave Command supervision not supported for: ${whatWasSent}. Re-sending without supervision."
-			markSupervisionNotSupported(whatWasSent)
-			sendToDevice(whatWasSent, ep )
+		case 0x00: // "No Support" 
+			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID)
+			if (ignoreSupervisionNoSupportCode()) {
+				if (logEnable) log.debug "Received a 'No Support' supervision report ${cmd} for command ${whatWasSent}, but this device has known problems with its Supervision implementation so the 'No Support' code was ignored."
+			} else 	{
+				log.warn "Device ${targetDevice.displayName}: Z-Wave Command supervision reported as 'No Support' for command ${whatWasSent}. If you see this warning repeatedly, please report as an issue on https://github.com/jvmahon/HubitatCustom/issues. Please provide the manufacturer, deviceType, and deviceId code for your device as shown on the device's Hubitat device web page."
+			}
 			break
-		case 0x01:
+		case 0x01: // "working"
+			whatWasSent = whatThisDeviceSent?.get(cmd.sessionID)
 			if (txtEnable) log.info "Device ${targetDevice.displayName}: Still processing command: ${whatWasSent}."
-		case 0x02:
-			log.warn "Device ${targetDevice.displayName}: Z-Wave supervised command reported failure. Failed command: ${whatWasSent}. Re-sending without supervision."
-			markSupervisionNotSupported(whatWasSent)
-			sendToDevice(whatWasSent, ep )
+			log.debug "Should reset timeout for failure to receive supervision report"
+			break ;
+		case 0x02: // "Fail"
+			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID)
+			log.warn "Device ${targetDevice.displayName}: Z-Wave supervised command reported failure. Failed command: ${whatWasSent}."
+			sendSupervised(zwave.basicV1.basicGet(), ep)
 			break
-		case 0xFF:
-			if (txtEnable) log.info "Device ${targetDevice.displayName}: Device successfully processed supervised command ${whatWasSent}."
+		case 0xFF: // "Success"
+			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID)
+			if (txtEnable || logEnable) log.info "Device ${targetDevice.displayName}: Device successfully processed supervised command ${whatWasSent}."
 			break
 	}
+	if (whatThisDeviceSent?.size() < 1) unschedule(supervisionCheck)
 }
+void supervisionCheck() {
+	log.debug "Running supervisionCheck"
+	
+    // re-attempt once
+	ConcurrentHashMap tryAgain = supervisionSentCommands?.get(device.getDeviceNetworkId() as String)
+	if (logEnable) log.debug "SuperVision commands to be tried again are: ${tryAgain}"
+	tryAgain?.each{ sessionId, cmd ->
+		if (logEnable) log.debug "Device ${device.displayName}: Supervision Check is resending command: ${cmd} with sessionId: ${sessionId}"
+		sendHubCommand(new hubitat.device.HubAction( cmd, hubitat.device.Protocol.ZWAVE)) 
+		supervisionSentCommands?.get(device.getDeviceNetworkId() as String).remove(sessionId)
+	}
+	
+}
+
+
 
 //////////////////////////////////////////////////////////////////////
 //////                  Z-Wave Helper Functions                ///////
@@ -2038,7 +2122,7 @@ String secure(Integer cmd, Integer hexBytes = 2, Short ep = null ) {
 
 String secure(String cmd, Short ep = null ){ 
 	if (ep) {
-		return zwaveSecureEncap(zwave.multiChannelV4.multiChannelCmdEncap(destinationEndPoint: ep).encapsulate(cmd))
+		return zwaveSecureEncap(zwave.multiChannelV4.multiChannelCmdEncap(sourceEndPoint: 0, bitAddress: 0, res01:0, destinationEndPoint: ep).encapsulate(cmd))
 	} else {
 		return zwaveSecureEncap(cmd) 
 	}
@@ -2046,11 +2130,12 @@ String secure(String cmd, Short ep = null ){
 
 String secure(hubitat.zwave.Command cmd, Short ep = null ){ 
 	if (ep) {
-		return zwaveSecureEncap(zwave.multiChannelV4.multiChannelCmdEncap(destinationEndPoint: ep).encapsulate(cmd))
+		return zwaveSecureEncap(zwave.multiChannelV4.multiChannelCmdEncap(sourceEndPoint: 0, bitAddress: 0, res01:0, destinationEndPoint: ep).encapsulate(cmd))
 	} else {
 		return zwaveSecureEncap(cmd) 
 	}
 }
+
 
 ////    Multi-Channel Encapsulation   ////
 void zwaveEvent(hubitat.zwave.commands.multichannelv4.MultiChannelCmdEncap cmd) {
@@ -2074,13 +2159,7 @@ void sendToDevice(List<hubitat.zwave.Command> cmds) { sendHubCommand(new hubitat
 
 void sendToDevice(hubitat.zwave.Command cmd, Short ep = null ) { sendHubCommand(new hubitat.device.HubAction(secure(cmd, ep), hubitat.device.Protocol.ZWAVE)) }
 
-void sendSupervised(hubitat.zwave.Command cmd, Short ep = null ) { 
-		String sendThis = secure(supervise(cmd), ep)
-		if (logEnable) {
-			log.debug "Device ${getTargetDeviceByEndPoint(ep).displayName}: In sendSupervised, Sending supervised command: " + sendThis
-		}
-		sendHubCommand(new hubitat.device.HubAction( sendThis, hubitat.device.Protocol.ZWAVE)) 
-	}
+
 void sendToDevice(String cmd) { sendHubCommand(new hubitat.device.HubAction(cmd, hubitat.device.Protocol.ZWAVE)) }
 
 List<String> commands(List<hubitat.zwave.Command> cmds, Long delay=200) { return delayBetween(cmds.collect{ it }, delay) }
@@ -2095,12 +2174,13 @@ void sendZwaveValue(Map params = [value: null , duration: null , ep: null ] )
 	}
 	
 	if (implementsZwaveClass(0x26, params.ep)) { // Multilevel  type device
-		sendSupervised(zwave.switchMultilevelV4.switchMultilevelSet(value: newValue, dimmingDuration:params.duration as Short), params.ep)	
+		if (! params.duration.is( null) ) sendSupervised(zwave.switchMultilevelV4.switchMultilevelSet(value: newValue, dimmingDuration:params.duration as Short), params.ep)	
+			else sendSupervised(zwave.switchMultilevelV1.switchMultilevelSet(value: newValue), params.ep)
 	} else if (implementsZwaveClass(0x25, params.ep)) { // Switch Binary Type device
 		sendSupervised(zwave.switchBinaryV1.switchBinarySet(switchValue: newValue ), params.ep)
 	} else if (implementsZwaveClass(0x20, params.ep)) { // Basic Set Type device
 		log.warn "Device ${targetDevice.displayName}: Using Basic Set to turn on device. A more specific command class should be used!"
-		sendSupervised(zwave.basicV2.basicSet(value: newValue ), params.ep)
+		sendSupervised(zwave.basicV1.basicSet(value: newValue ), params.ep)
 	} else {
 		log.error "Device ${device.displayName}: Error in function sendZwaveValue(). Device does not implement a supported class to control the device!.${ep ? " Endpoint # is: ${params.ep}." : ""}"
 		return
