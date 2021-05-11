@@ -213,8 +213,6 @@ com.hubitat.app.DeviceWrapper getTargetDeviceByEndPoint(Short ep = null )
 
 void updated()
 {
-
-
 }
 
 		
@@ -222,135 +220,13 @@ void updated()
 //////        Handle Supervision request and reports           ///////
 ////////////////////////////////////////////////////////////////////// 
 
-// @Field static results in variable being shared among all devices that use the same driver, so I use a concurrentHashMap keyed by a device's deviceNetworkId to get a unqiue value for a particular device
-// supervisionSessionIDs stores the last used sessionID value (0..31) for a device. It must be incremented mod 32 on each send
-// supervisionSentCommands stores the last command sent
-// Each is initialized for 64 devices, but can automatically grow
-@Field static ConcurrentHashMap<String, Short> supervisionSessionIDs = new ConcurrentHashMap<String, Short>(64)
-@Field static ConcurrentHashMap<String, ConcurrentHashMap> supervisionSentCommands = new ConcurrentHashMap<String, ConcurrentHashMap<Short, String>>(64)
-
-Short getNewSessionId() {
-		// Get the next session ID mod 64, but if there is no stored session ID, initialize it with a random value.
-		Short lastSessionID = supervisionSessionIDs.get(device.getDeviceNetworkId() as String,((Math.random() * 64) % 64) as Short )
-		Short nextSessionID = (lastSessionID + 1) % 64 // increment and then mod with 64, and then store it back in the Hash table.
-		supervisionSessionIDs.replace(device.getDeviceNetworkId(), nextSessionID)
-		return nextSessionID
-} 
-Boolean getSuperviseThis()
-{
-		return (getDataValue("S2")?.toInteger() != null)
-}
-
-void sendSupervised(hubitat.zwave.Command cmd ) { 
-	com.hubitat.app.DeviceWrapper targetDevice = device
-	
-	Short thisSessionId = getNewSessionId()
-	
-	ConcurrentHashMap commandStorage = supervisionSentCommands.get(device.getDeviceNetworkId() as String, new ConcurrentHashMap<Short, hubitat.zwave.Command>(64))
-	
-	def sendThisCommand = cmd // use def rather than more specific data class, as data class changes from a Hubitat Command to a String after security encapsulation
-
-	if (superviseThis)
-	{
-		sendThisCommand = zwave.supervisionV1.supervisionGet(sessionID: thisSessionId, statusUpdates: true ).encapsulate(sendThisCommand)
-		sendThisCommand = secure(sendThisCommand, ep) // Returns security and endpoint encapsulated string
-		commandStorage.put(thisSessionId, sendThisCommand)
-		sendHubCommand(new hubitat.device.HubAction( sendThisCommand, hubitat.device.Protocol.ZWAVE)) 
-		runIn(5, supervisionCheck)	
-		if (logEnable)  log.debug "Device ${targetDevice}: In sendSupervised, Sending supervised command: ${sendThisCommand}"
-
-	} else {
-		sendThisCommand = secure(sendThisCommand, ep) // Returns security and endpoint encapsulated string
-		sendHubCommand(new hubitat.device.HubAction( sendThisCommand, hubitat.device.Protocol.ZWAVE)) 
-		if (logEnable)  log.debug "Device ${targetDevice}: In sendSupervised, Sending Un-supervised command: ${sendThisCommand}"
-	}
-}
-	
-
-// This handles a supervised message (a "get") received from the Z-Wave device //
-void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionGet cmd ) {
-	com.hubitat.app.DeviceWrapper targetDevice = device
-	if (logEnable) log.debug "Device ${targetDevice.displayName}: Supervision Get - SessionID: ${cmd.sessionID}, Command Class: ${cmd.commandClassIdentifier}, Command: ${cmd.commandIdentifier}"
-	
-    hubitat.zwave.Command encapsulatedCommand = cmd.encapsulatedCommand(defaultParseMap)
-	
-    if (encapsulatedCommand) {
-		if ( ep ) {
-			zwaveEvent(encapsulatedCommand, ep)
-		} else {
-			zwaveEvent(encapsulatedCommand)
-		}
+void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionGet cmd) {
+    hubitat.zwave.Command encapCmd = cmd.encapsulatedCommand(commandClassVersions)
+    if (encapCmd) {
+        zwaveEvent(encapCmd)
     }
-	
-	hubitat.zwave.Command confirmationReport = (new hubitat.zwave.commands.supervisionv1.SupervisionReport(sessionID: cmd.sessionID, reserved: 0, moreStatusUpdates: false, status: 0xFF, duration: 0))
-	
-	sendHubCommand(new hubitat.device.HubAction(secure(confirmationReport, ep), hubitat.device.Protocol.ZWAVE))
-
+    sendHubCommand(new hubitat.device.HubAction(zwaveSecureEncap(zwave.supervisionV1.supervisionReport(sessionID: cmd.sessionID, reserved: 0, moreStatusUpdates: false, status: 0xFF, duration: 0).format()), hubitat.device.Protocol.ZWAVE))
 }
-
-Boolean ignoreSupervisionNoSupportCode()
-{
-	// Some devices implement the Supervision command class incorrectly and return a "No Support" code even when they work.
-	// This function is to ignore the No Support code from those devices.
-	List<Map> poorSupervisionSupport = [
-			[	manufacturer:12,  	deviceType:17479,	deviceId: 12340  	], // HomeSeer WD100 S2 is buggy!
-			[	manufacturer:12,  	deviceType:17479,	deviceId: 12342  	], // HomeSeer WD200 is buggy!
-			]
-    	Map thisDevice =	poorSupervisionSupport.find{ element ->
-							((element.manufacturer == getDataValue("manufacturer")?.toInteger()) && (element.deviceId == getDataValue("deviceId")?.toInteger()) && (element.deviceType == getDataValue("deviceType")?.toInteger()))
-						}
-		return ( thisDevice ? true : false )
-						
-}
-
-void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionReport cmd ) {
-	com.hubitat.app.DeviceWrapper targetDevice = device
-	
-	ConcurrentHashMap whatThisDeviceSent = supervisionSentCommands?.get(device.getDeviceNetworkId() as String)
-	
-	String whatWasSent = null
-
-	switch (cmd.status as Integer)
-	{
-		case 0x00: // "No Support" 
-			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID)
-			if (ignoreSupervisionNoSupportCode()) {
-				if (logEnable) log.debug "Received a 'No Support' supervision report ${cmd} for command ${whatWasSent}, but this device has known problems with its Supervision implementation so the 'No Support' code was ignored."
-			} else 	{
-				log.warn "Device ${targetDevice.displayName}: Z-Wave Command supervision reported as 'No Support' for command ${whatWasSent}. If you see this warning repeatedly, please report as an issue on https://github.com/jvmahon/HubitatCustom/issues. Please provide the manufacturer, deviceType, and deviceId code for your device as shown on the device's Hubitat device web page."
-			}
-			break
-		case 0x01: // "working"
-			whatWasSent = whatThisDeviceSent?.get(cmd.sessionID)
-			if (txtEnable) log.info "Device ${targetDevice.displayName}: Still processing command: ${whatWasSent}."
-			log.debug "Should reset timeout for failure to receive supervision report"
-			break ;
-		case 0x02: // "Fail"
-			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID)
-			log.warn "Device ${targetDevice.displayName}: Z-Wave supervised command reported failure. Failed command: ${whatWasSent}."
-			sendSupervised(zwave.basicV1.basicGet(), ep)
-			break
-		case 0xFF: // "Success"
-			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID)
-			if (txtEnable || logEnable) log.info "Device ${targetDevice.displayName}: Device successfully processed supervised command ${whatWasSent}."
-			break
-	}
-	if (whatThisDeviceSent?.size() < 1) unschedule(supervisionCheck)
-}
-void supervisionCheck() {
-	log.debug "Running supervisionCheck"
-	
-    // re-attempt once
-	ConcurrentHashMap tryAgain = supervisionSentCommands?.get(device.getDeviceNetworkId() as String)
-	if (logEnable) log.debug "SuperVision commands to be tried again are: ${tryAgain}"
-	tryAgain?.each{ sessionId, cmd ->
-		if (logEnable) log.debug "Device ${device.displayName}: Supervision Check is resending command: ${cmd} with sessionId: ${sessionId}"
-		sendHubCommand(new hubitat.device.HubAction( cmd, hubitat.device.Protocol.ZWAVE)) 
-		supervisionSentCommands?.get(device.getDeviceNetworkId() as String).remove(sessionId)
-	}
-	
-}
-
 
 
 //////////////////////////////////////////////////////////////////////
