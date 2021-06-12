@@ -14,6 +14,7 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 
 	if (logEnable) log.debug "Device ${targetDevice}: Received NotificationReport: ${cmd}"
 	
+	// Map of all the Z-Wave Notifications that are 'meaningful' in Hubitat.
 	Map events =
 		[ 	1:[ // Smoke
 				0:[	
@@ -44,13 +45,13 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 				],
 			2:[ // CO2
 				0:[
-					1:[name:"carbonDioxideDetected" , value:"clear", descriptionText:"Carbon Dioxide status."],
+					1:[name:"carbonDioxideDetected" , value:"clear", descriptionText:"Carbon Dioxide status."], // Needs custom attribute 'carbonDioxideDetected'
 					2:[name:"carbonDioxideDetected" , value:"clear", descriptionText:"Carbon Dioxide status."],	
 					4:[name:"consumableStatus " , value:"good", descriptionText:"Replacement (cleared)."],				
 					5:[name:"consumableStatus " , value:"good", descriptionText:"Replacement (cleared)."],				
 					7:[name:"consumableStatus" , value:"good", descriptionText:"Maintenance required cleared, periodic inspection."],				
 					], 
-				1:[name:"carbonDioxideDetected" , value:"detected", descriptionText:"Carbon Dioxide detected (location provided)."], 
+				1:[name:"carbonDioxideDetected" , value:"detected", descriptionText:"Carbon Dioxide detected (location provided)."], // Needs custom attribute 'carbonDioxideDetected'
 				2:[name:"carbonDioxideDetected" , value:"detected", descriptionText:"Carbon Dioxide detected."]
 				],					
 			5:[ // Water
@@ -82,8 +83,8 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 						2:[name:"contact" , value:"closed", descriptionText:"Contact sensor, closed"], 					
 						3:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
 						4:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
-						5:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected (location provided)"], // glassBreakage  attribute!
-						6:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected"], 	 // glassBreakage custom attribute!					
+						5:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected (location provided)"], // glass Breakage !
+						6:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected"], 	 // glass Breakage					
 						7:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
 						8:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
 						9:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
