@@ -1,11 +1,11 @@
 # HubitatCustom
 
-## Known Problems
 
-Zen30: As of release 1.0.11, the driver does not properly support the Zen30 relay switch. I'll get it eventually!
+The 1.1.6 release is an almost complete re-write. In this release, the driver learns about a devices capabilities in one of two ways: 
+1. There's an existing database of devices stored in the @Field variable "deviceDatabase" which contains information on devices that I own (Ring G2 Motion sensor, Zooz ZSE18 / Zen25 / Zen26 / Zen30, HomeSeer WD100 / WS100 / WD200 / WS200, Jasco 46201, GE Heavy Duty Switch 14285, Inovelli LZW36). If you have one of those, its in the database.
+2. If your device isn't in the deviceDatabase, its information gets pulled from oepnsmarthouse.or and stored in a state variable. 
 
-## Current Plans . . .
-May 1, 2021: Update - Code has been reworked with a focuse on better Supervision and S2 handling.
+I'll document how this all works at some point.
 
 # Advanced Zwave Plus Dimmer driver  and Switch driver- Beta Releases!
 
