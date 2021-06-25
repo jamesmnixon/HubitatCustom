@@ -5,7 +5,7 @@ import groovy.transform.Field
 @Field static ConcurrentHashMap globalDataStorage = new ConcurrentHashMap(64)
 
 metadata {
-	definition (name: "Almost Any Switch Z-wave Plus Switch Driver v1.1.6",namespace: "jvm", author: "jvm") {
+	definition (name: "Any Z-Wave Switch Driver v1.1.8",namespace: "jvm", author: "jvm") {
 		capability "Initialize"
 		capability "Refresh"
 
@@ -18,7 +18,7 @@ metadata {
         // capability "TamperAlert"
 		// capability "WaterSensor"
 		// capability "ContactSensor"
-		// attribute "glassBreakage"		
+		// capability "ShockSensor"		// Use this for glass breakage
 		// capability "IllumanceMeasurement"
 		// capability "LiquidFlowRate"
 		// attribute "carbonDioxideDetected"
@@ -28,10 +28,10 @@ metadata {
 		capability "VoltageMeasurement"
         capability "CurrentMeter"
 		attribute "energyConsumed", "number" 	// Custom Attribute for meter devices supporting energy consumption. Comment out if not wanted.
-		attribute "powerFactor", "number"	// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
-		attribute "pulseCount", "number"		// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
-		attribute "reactiveCurrent", "number"		// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
-		attribute "reactivePower", "number"		// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
+		// attribute "powerFactor", "number"	// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
+		// attribute "pulseCount", "number"		// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
+		// attribute "reactiveCurrent", "number"		// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
+		// attribute "reactivePower", "number"		// Custom Attribute for meter devices supporting powerFactor. Comment out if not wanted.
 		
 		// capability "Battery"
 
@@ -54,15 +54,9 @@ metadata {
 					[name:"value",type:"NUMBER", description:"Parameter Value", constraints:["NUMBER"]]
 					]	
 
-		// Following Commands are for debugging.
-        command "logDataRecord"
-		// command "getParameterValuesFromDevice"
-		// command "refreshMeters"
-		// command "reparseDeviceData"
-		// command "showglobalDataRecord"
-		// command "deleteUnwantedChildDevices"
-		// command "createChildDevices"
-		// command "refreshNotifications"
+		// Following Command is to help create a new data record to be added to deviceDatabase
+        // command "logDataRecord"
+
     }
 	
 	preferences 
@@ -111,6 +105,7 @@ void createChildDevices()
 /////////////////////////////////////////////////////////////////
 
 void identify() {
+	log.warn "Device ${device.displayName}: The 'identify' function is experimental and only works for Zwave Plus Version 2 or greater devices!"
 	// Identify function supported by Zwave Plus Version 2 and greater devices!
 		List<Map<String, Short>> indicators = [
 			[indicatorId:0x50, propertyId:0x03, value:0x08], 
@@ -268,7 +263,7 @@ Map getThisDeviceDataRecord(){
 }
 
 Map getDeviceInputs()  { 
-	Map returnMe = dataRecordByProduct?.deviceRecord?.deviceInputs
+	Map returnMe = dataRecordByProduct?.deviceRecord?.deviceInputs.sort({it.key})
 	if (logEnable && returnMe.is( null ) ) log.warn "Device ${device.displayName}: Device has no inputs. Check if device was initialized. returnMe is ${returnMe}."
 	return returnMe
 }
@@ -715,7 +710,7 @@ void processPendingChanges()
 }
 
 void setParameter(parameterNumber, value = null ) {
-	if (parameterNumber && value) {
+	if (parameterNumber && ( ! value.is( null) )) {
 		setParameter(parameterNumber:parameterNumber, value:value)
 	} else if (parameterNumber) {
 		sendUnsupervised( zwave.configurationV1.configurationGet(parameterNumber: parameterNumber))
@@ -736,7 +731,7 @@ Boolean setParameter(Map params = [parameterNumber: null , value: null ] ){
 	
 	if (!PSize) {log.error "Device ${device.displayName}: Could not get parameter size in function setParameter. Defaulting to 1"; PSize = 1}
 
-	sendSupervised(zwave.configurationV1.configurationSet(scaledConfigurationValue: params.value as BigInteger, parameterNumber: params.parameterNumber, size: PSize))
+	sendUnsupervised(zwave.configurationV1.configurationSet(scaledConfigurationValue: params.value as BigInteger, parameterNumber: params.parameterNumber, size: PSize))
 	// The 'get' should not be supervised!
 	sendUnsupervised( zwave.configurationV1.configurationGet(parameterNumber: params.parameterNumber))
 	
@@ -961,7 +956,7 @@ void zwaveEvent(hubitat.zwave.commands.supervisionv1.SupervisionReport cmd, ep =
 		case 0x02: // "Fail"
 			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID as Integer)
 			log.warn "Device ${targetDevice.displayName}: Z-Wave supervised command reported failure. Failed command: ${whatWasSent}."
-			sendSupervised(zwave.basicV1.basicGet(), ep)
+			sendUnsupervised(zwave.basicV1.basicGet(), ep)
 			break
 		case 0xFF: // "Success"
 			whatWasSent = whatThisDeviceSent?.remove(cmd.sessionID as Integer)
@@ -1262,8 +1257,8 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 						2:[name:"contact" , value:"closed", descriptionText:"Contact sensor, closed"], 					
 						3:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
 						4:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
-						5:[name:"glassBreakage" , value:"clear", descriptionText:"Glass Breakage Not Detected (location provided)"], // glassBreakage  attribute!
-						6:[name:"glassBreakage" , value:"clear", descriptionText:"Glass Breakage Not Detected"], 	 // glassBreakage custom attribute!					
+						5:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected (location provided)"], // glassBreakage  attribute!
+						6:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected"], 	 // glassBreakage custom attribute!					
 						7:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
 						8:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
 						9:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
@@ -1273,8 +1268,8 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 				2:[name:"contact" , value:"open", descriptionText:"Contact sensor, open"], 					
 				3:[name:"tamper" , value:"detected", descriptionText:"Tampering, device cover removed"], 
 				4:[name:"tamper" , value:"detected", descriptionText:"Tampering, invalid code."], 
-				5:[name:"glassBreakage" , value:"detected", descriptionText:"Glass Breakage Detected (location provided)"], 
-				6:[name:"glassBreakage" , value:"detected", descriptionText:"Glass Breakage Detected"], 				
+				5:[name:"shock" , value:"detected", descriptionText:"Glass Breakage Detected (location provided)"], 
+				6:[name:"shock" , value:"detected", descriptionText:"Glass Breakage Detected"], 				
 				7:[name:"motion" , value:"active", descriptionText:"Motion detected (location provided)."],
 				8:[name:"motion" , value:"active", descriptionText:"Motion detected."],
 				9:[name:"tamper" , value:"detected", descriptionText:"Tampering, device moved"]
@@ -1870,7 +1865,7 @@ Map createInputControls(data)
 		classVersions:[0:1, 85:0, 89:1, 90:1, 94:1, 108:0, 112:1, 113:8, 114:1, 115:1, 122:1, 128:1, 133:2, 134:2, 135:3, 142:3, 159:0], 
 		endpoints:[
 				0:[
-					classes:[85, 89, 90, 94, 108, 112, 113, 114, 115, 122, 128, 133, 134, 135, 142, 159], 
+					classes:[80, 85, 89, 90, 94, 108, 112, 113, 114, 115, 122, 128, 133, 134, 135, 142, 159], 
 					notifications:[7:[3, 8], 8:[1, 5], 9:[4, 5]]]
 				],
 		deviceInputs:[
@@ -1946,22 +1941,27 @@ Map createInputControls(data)
 		endpoints:[
 					0:[classes:[0, 32, 38, 39, 43, 44, 89, 90, 91, 94, 112, 114, 115, 122, 133, 134]]
 				], 
-		deviceInputs:[
-			11:[size:1, name:'11', description:'Set dimmer ramp rate for remote control', range:'0..90', title:'(11) Remote Ramp Rate', type:'number'], 
+		deviceInputs:[ // Firmware 5.14 and above!
+			3:[size:1, name:'3', options:['0':'Bottom LED ON if load is OFF', '1':'Bottom LED OFF if load is OFF'], title:'(3) Bottom LED Operation', type:'enum'], 
+			4:[size:1, name:'4', options:['0':'Normal - Top of Paddle turns load ON', '1':'Inverted - Bottom of Paddle turns load ON'], title:'(4) Paddle Orientation', type:'enum'], 
+			5:[size:1, name:'5', options:['0':'(0) No minimum set', '1':'(1) 6.5%', '2':'(2) 8%', '3':'(3) 9%', '4':'(4) 10%', '5':'(5) 11%', '6':'(6) 12%', '7':'(7) 13%', '8':'(8) 14%', '9':'(9) 15%', '10':'(10) 16%', '11':'(11) 17%', '12':'(12) 18%', '13':'(13) 19%', '14':'(14) 20%'], title:'(5) Minimum Dimming Level', type:'enum'],
+ 			6:[size:1, name:'6', options:['0':'Central Scene Enabled', '1':'Central Scene Disabled'], title:'(5) Central Scene Enable/Disable', type:'enum'], 			
+			11:[size:1, name:'11', range:'0..90', title:'(11) Set dimmer ramp rate for remote control (seconds)', type:'number'], 
+			12:[size:1, name:'12', range:'0..90', title:'(12) Set dimmer ramp rate for local control (seconds)', type:'number'], 
+			13:[size:1, name:'13', options:['0':'LEDs show load status', '1':'LEDs display a custom status'], description:'Set dimmer display mode', title:'(13) Status Mode', type:'enum'], 	
+			14:[size:1, name:'14', options:['0':'White', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan'], title:'(14) Set the LED color when displaying load status', type:'enum'], 		
+			21:[size:1, name:'21', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(21) Status LED 1 Color (bottom LED)', type:'enum'],
 			22:[size:1, name:'22', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(22) Status LED 2 Color', type:'enum'], 
-			12:[size:1, name:'12', description:'Set dimmer ramp rate for local control', range:'0..90', title:'(12) Local Ramp Rate', type:'number'], 
 			23:[size:1, name:'23', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(23) Status LED 3 Color', type:'enum'], 
-			13:[size:1, name:'13', options:['0':'Load Status', '1':'Custom Status'], description:'Set dimmer display mode', title:'(13) Status Mode', type:'enum'], 
+
 			24:[size:1, name:'24', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(24) Status LED 4 Color', type:'enum'], 
-			14:[size:1, name:'14', options:['0':'White', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan'], description:'Set the LED color when displaying load status', title:'(14) Load Status LED Color', type:'enum'], 
+
 			25:[size:1, name:'25', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(25) Status LED 5 Color', type:'enum'], 
 			26:[size:1, name:'26', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(26) Status LED 6 Color', type:'enum'], 
-			27:[size:1, name:'27', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], description:'Status LED 7 Color (top)', title:'(27) Status LED 7 Color', type:'enum'], 
-			3:[size:1, name:'3', options:['0':'Bottom LED ON if load is OFF', '1':'Bottom LED OFF if load is OFF'], description:'Sets the operation of the bottom LED', title:'(3) Bottom LED Operation', type:'enum'], 
-			4:[size:1, name:'4', options:['0':'Top of Paddle turns load ON', '1':'Bottom of Paddle turns load ON'], description:'Set paddle load orientation', title:'(4) Orientation', type:'enum'], 
-			30:[size:1, name:'30', description:'Set blink frequency when displaying custom status', range:'0..255', title:'(30) Blink Frequency', type:'number'], 
-			31:[size:1, name:'31', description:'LED 7 Blink Status (top)', type:'number', title:'(31) LED 7 Blink Status - bitmap'], 
-			21:[size:1, name:'21', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], description:'Status LED 1 Color (bottom)', title:'(21) Status LED 1 Color', type:'enum']
+			27:[size:1, name:'27', options:['0':'Off', '1':'Red', '2':'Green', '3':'Blue', '4':'Magenta', '5':'Yellow', '6':'Cyan', '7':'White'], title:'(27) Status LED 7 Color (top LED)', type:'enum'], 
+			30:[size:1, name:'30', range:'0..255', title:'(30) Blink Frequency when displaying custom status', type:'number'], 
+			31:[size:1, name:'31', type:'number', title:'(31) LED 7 Blink Status - bitmap', description:'bitmap defines LEDs to blink '], 
+
 		]
 	],
 	[
