@@ -5,7 +5,7 @@ import groovy.transform.Field
 @Field static ConcurrentHashMap globalDataStorage = new ConcurrentHashMap(64)
 
 metadata {
-	definition (name: "Any Z-Wave Switch Driver v1.1.8",namespace: "jvm", author: "jvm") {
+	definition (name: "Any Z-Wave Switch Driver v1.1.9",namespace: "jvm", author: "jvm") {
 		capability "Initialize"
 		capability "Refresh"
 
@@ -55,7 +55,7 @@ metadata {
 					]	
 
 		// Following Command is to help create a new data record to be added to deviceDatabase
-        // command "logDataRecord"
+        command "logDataRecord"
 
     }
 	
@@ -1182,14 +1182,9 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.EventSupportedReport cmd, 
 	thisEndpointNotifications.put( (cmd.notificationType as Integer), supportedEventsByType)
 }
 
-
-void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep = null )
+Map getFormattedZWaveNotificationEvent(def cmd)
 {
-	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
-
-	if (logEnable) log.debug "Device ${targetDevice}: Received NotificationReport: ${cmd}"
-	
-	Map events =
+	Map returnEvent =
 		[ 	1:[ // Smoke
 				0:[	
 					1:[name:"smoke" , value:"clear", descriptionText:"Smoke detected (location provided) status Idle."],
@@ -1257,8 +1252,8 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 						2:[name:"contact" , value:"closed", descriptionText:"Contact sensor, closed"], 					
 						3:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
 						4:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
-						5:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected (location provided)"], // glassBreakage  attribute!
-						6:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected"], 	 // glassBreakage custom attribute!					
+						5:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected (location provided)"], // glass Breakage  attribute!
+						6:[name:"shock" , value:"clear", descriptionText:"Glass Breakage Not Detected"], 	 // glass Breakage attribute!					
 						7:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
 						8:[name:"motion" , value:"inactive", descriptionText:"Motion Inactive."],
 						9:[name:"tamper" , value:"clear", descriptionText:"Tamper state cleared."],
@@ -1305,24 +1300,33 @@ void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep
 				]
 				
 		].get(cmd.notificationType as Integer)?.get(cmd.event as Integer)
-	
-	if ( ! events ) { 
-		if( logEnable ) log.debug "Device ${targetDevice.displayName}: Received an unhandled notifiation event ${cmd} for endpoint ${ep}." 
+
+		if (returnEvent.is( null )) return null
+		
+		if ((cmd.event == 0) && (cmd.eventParametersLength == 1)) { // This is for clearing events.
+				return returnEvent.get(cmd.eventParameter[0] as Integer)
+		}
+		
+		if (cmd.eventParametersLength > 1) { // This is unexpected! None of the current notifications use this.
+			log.error "In function getZWaveNotificationEvent(), received command with eventParametersLength of unexpected size."
+			return null
+		} 
+		return returnEvent
+}
+
+void zwaveEvent(hubitat.zwave.commands.notificationv8.NotificationReport cmd, ep = null )
+{
+	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+
+	Map thisEvent = getFormattedZWaveNotificationEvent(cmd)
+
+	if ( ! thisEvent ) { 
+		if ( logEnable ) log.debug "Device ${targetDevice.displayName}: Received an unhandled report ${cmd} for endpoint ${ep}." 
 	} else { 
-	
-		if ((cmd.eventParametersLength as Integer) == 0) {
-			if (targetDevice.hasAttribute(events.name)) { 
-				targetDevice.sendEvent(events) 
-			} else {
-				log.warn "Device ${targetDevice.displayName}: Device missing attribute for notification event ${events}, device report: ${cmd}."
-			}
-			
-		} else if ((cmd.eventParametersLength as Integer) == 1) {
-			Map clearMessage = events.get(cmd.eventParameter[0] as Integer)
-			if (logEnable) log.debug "Clearing an notification state by sending event: ${clearMessage}"
-			if (clearMessage) targetDevice.sendEvent(clearMessage)
+		if (targetDevice.hasAttribute(thisEvent.name)) { 
+			targetDevice.sendEvent(thisEvent) 
 		} else {
-			log.error "Device ${targetDevice.displayName}: Driver Error - generated a Notification with an eventParametersLength > 1 from device report ${cmd}. Expected zero length eventParameter[0] field." 
+			log.warn "Device ${targetDevice.displayName}: Device missing attribute for event ${thisEvent}, Zwave report: ${cmd}."
 		}
 	}
 }
@@ -1339,14 +1343,9 @@ void performBinarySensorRefresh(type, events, ep) {
 	log.debug "Device ${device}: performBinarySensorRefresh function is not implemented."
 }
 
-void zwaveEvent(hubitat.zwave.commands.sensorbinaryv2.SensorBinaryReport cmd, ep = null )
+Map getFormattedZWaveSensorBinaryEvent(def cmd)
 {
-	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
-
-	if (logEnable) log.debug "Device ${targetDevice}: Received SensorBinaryReport: ${cmd}"
-	
-	Map events = 
-		[ 	
+	Map returnEvent = [ 	
 			2:[ // Smoke
 				0:[name:"smoke" , value:"clear", descriptionText:"Smoke detector status Idle."],
 				255:[name:"smoke" , value:"detected", descriptionText:"Smoke detected."], 
@@ -1377,25 +1376,32 @@ void zwaveEvent(hubitat.zwave.commands.sensorbinaryv2.SensorBinaryReport cmd, ep
 				]
 				
 		].get(cmd.sensorType as Integer)?.get(cmd.sensorValue as Integer)
+		return returnEvent
+}
+
+void zwaveEvent(hubitat.zwave.commands.sensorbinaryv2.SensorBinaryReport cmd, ep = null )
+{
+	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+
+	if (logEnable) log.debug "Device ${targetDevice}: Received SensorBinaryReport: ${cmd}"
 	
-	if ( ! events ) { 
-		if( logEnable ) log.debug "Device ${targetDevice.displayName}: Received an unhandled binary sensor report ${cmd} for endpoint ${ep}." 
+	Map thisEvent = getFormattedZWaveSensorBinaryEvent(cmd)
+	
+	if ( ! thisEvent ) { 
+		if ( logEnable ) log.debug "Device ${targetDevice.displayName}: Received an unhandled report ${cmd} for endpoint ${ep}." 
 	} else { 
-		if (targetDevice.hasAttribute(events.name)) { 
-			targetDevice.sendEvent(events) 
+		if (targetDevice.hasAttribute(thisEvent.name)) { 
+			targetDevice.sendEvent(thisEvent) 
 		} else {
-			log.warn "Device ${targetDevice.displayName}: Device missing attribute for notification event ${events}, notification report: ${cmd}."
+			log.warn "Device ${targetDevice.displayName}: Device missing attribute for event ${thisEvent}, Zwave report: ${cmd}."
 		}
 	}
 }
 //////////////////////////////////////////////////////////////////////
 //////        Handle  Multilevel Sensor       ///////
 //////////////////////////////////////////////////////////////////////
-
-void zwaveEvent(hubitat.zwave.commands.sensormultilevelv11.SensorMultilevelReport cmd, ep = null )
+Map getFormattedZWaveSensorMultilevelReportEvent(def cmd)
 {
-	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
-
 	Map tempReport = [
 		1: [name: "temperature", value: null , unit: "°${temperatureScale}", descriptionText:"Air temperature"], 
 		23:[name: "temperature", value: null , unit: "°${temperatureScale}", descriptionText:"Water temperature"], 
@@ -1413,16 +1419,14 @@ void zwaveEvent(hubitat.zwave.commands.sensormultilevelv11.SensorMultilevelRepor
 		77:[name: "temperature", value: null , unit: "°${temperatureScale}", descriptionText:"Discharge Line temperature"],
 		80:[name: "temperature", value: null , unit: "°${temperatureScale}", descriptionText:"Defrost temperature"],	
 	].get(cmd.sensorType as Integer)
-	
-	// maybe use the convertTemperatureIfNeeded(BigDecimal value, String scale, Integer precision) method.
+
 	if (tempReport)
 	{
 		tempReport.value = convertTemperatureIfNeeded(cmd.scaledMeterValue, (((cmd.scale as Integer) == 0) ? "C" : "F"), 2)
-		targetDevice.sendEvent(tempReport)
-		return
+		returntempReport
 	}
-
-	Map sensorReport = [
+	
+	Map otherSensorReport = [
 		3000:[name: "illuminance", value: cmd.scaledMeterValue, unit: "%"], // Illuminance
 		3001:[name: "illuminance", value: cmd.scaledMeterValue, unit: "lx"],
 		4000:[name: "power", value: cmd.scaledMeterValue, unit: "W"],
@@ -1442,12 +1446,24 @@ void zwaveEvent(hubitat.zwave.commands.sensormultilevelv11.SensorMultilevelRepor
 		58000:[name: "rssi", value: cmd.scaledMeterValue, unit: "%"],
 		58001:[name: "rssi", value: cmd.scaledMeterValue, unit: "dBm"],
 		67000:[name: "pH", value: cmd.scaledMeterValue, unit: "pH"],
-	].get((cmd.sensorType * 1000 + cmd.scale) as Integer)
+	].get((cmd.sensorType * 1000 + cmd.scale) as Integer)	
 	
-	if (sensorReport) {
-		targetDevice.sendEvent(sensorReport)
-	} else {
-		log.warn "Device ${targetDevice.displayName}: Received an unsupported sensor report: " + cmd
+	return otherSensorReport
+}
+
+void zwaveEvent(hubitat.zwave.commands.sensormultilevelv11.SensorMultilevelReport cmd, ep = null )
+{
+	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+	Map thisEvent = getFormattedZWaveSensorMultilevelReportEvent(cmd)
+		
+	if ( ! thisEvent ) { 
+		if ( logEnable ) log.debug "Device ${targetDevice.displayName}: Received an unhandled report ${cmd} for endpoint ${ep}." 
+	} else { 
+		if (targetDevice.hasAttribute(thisEvent.name)) { 
+			targetDevice.sendEvent(thisEvent) 
+		} else {
+			log.warn "Device ${targetDevice.displayName}: Device missing attribute for event ${thisEvent}, Zwave report: ${cmd}."
+		}
 	}
 }
 
@@ -1458,6 +1474,7 @@ void zwaveEvent(hubitat.zwave.commands.sensormultilevelv11.SensorMultilevelRepor
 void	refreshMeters(ep = null ) {
 	// To make driver more generic, if meter type isn't known, then ask the device
 	List specifiedScales = thisDeviceDataRecord?.endpoints.get((ep ?: 0) as Integer)?.metersSupported
+	if (logEnable) log.debug "Refreshing a meter with scales ${specifiedScales}"
 	if (specifiedScales)
 	{ 
 		meterRefresh(specifiedScales, ep)
@@ -1469,6 +1486,8 @@ void	refreshMeters(ep = null ) {
 // Next function is not currently used! 
 void meterRefresh ( List supportedScales, ep = null ) 
 { // meterSupported is a List of supported scales - e.g., [2, 5, 6]]
+	if (logEnable) log.debug "Refreshing a meter with scales ${supportedScales}"
+
 	supportedScales.each{ scaleValue ->
 		if ((scaleValue as Integer) <= 6) {
 			sendUnsupervised(zwave.meterV6.meterGet(scale: scaleValue), ep)
@@ -1505,15 +1524,10 @@ void zwaveEvent(hubitat.zwave.commands.meterv6.MeterSupportedReport report, ep =
 	meterRefresh(scaleList, ep)
 }
 
-void zwaveEvent(hubitat.zwave.commands.meterv6.MeterReport cmd, ep = null )
+Map getFormattedZWaveMeterReportEvent(def cmd)
 {
-	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
-	
-	// if (logEnable && (cmd.rateType != 1)) log.warn "Device ${targetDevice.displayName}: Unexpected Meter rateType received. Value is: ${cmd.rateType}. Report is ${cmd}."
 	BigDecimal meterValue = cmd.scaledMeterValue
 	Integer deltaTime = cmd.deltaTime
-	
-	// if ((cmd.rateType as Integer) == 2) { meterValue = (-1) * meterValue }
 	
 	Map meterReport = [
 		1:[
@@ -1546,17 +1560,33 @@ void zwaveEvent(hubitat.zwave.commands.meterv6.MeterReport cmd, ep = null )
 		]
 	].get(cmd.meterType as Integer)?.get( ( (cmd.scale as Integer) * 1000 + ((cmd.scale2 ?: 0) as Integer)))
 	
+	if (meterReport.is( null )) return null
+	
 	if (cmd.scaledPreviousMeterValue) 
 		{
 			meterReport.put("previousValue", (cmd.scaledPreviousMeterValue) )
-			meterReport.descriptionText = meterReport.descriptionText + " Prior value: ${cmd.scaledPreviousMeterValue}"
+			String reportText = meterReport.descriptionText + " Prior value: ${cmd.scaledPreviousMeterValue}"
+			meterReport.put("descriptionText", reportText)
 		}
-	
-	if (targetDevice.hasAttribute(meterReport?.name)) {
-		targetDevice.sendEvent(meterReport)
-	} else {
-		log.warn "Device ${targetDevice.displayName}: Received unexpected meter type for ${targetDevice.displayName}. Driver does not support attribute for this report. Add Capability or custom attribute to the driver. Report is: ${meterReport}"
-	}
+		
+	return meterReport
+}
+
+void zwaveEvent(hubitat.zwave.commands.meterv6.MeterReport cmd, ep = null )
+{
+	com.hubitat.app.DeviceWrapper targetDevice = getTargetDeviceByEndPoint(ep)
+
+	Map thisEvent = getFormattedZWaveMeterReportEvent(cmd)
+	if (logEnable) log.debug "Responding to a meter report ${cmd} with event ${thisEvent}"
+	if ( ! thisEvent ) { 
+		if ( logEnable ) log.debug "Device ${targetDevice.displayName}: Received an unhandled report ${cmd} for endpoint ${ep}." 
+	} else { 
+		if (targetDevice.hasAttribute(thisEvent.name)) { 
+			targetDevice.sendEvent(thisEvent) 
+		} else {
+			log.warn "Device ${targetDevice.displayName}: Device missing attribute for event ${thisEvent}, Zwave report: ${cmd}."
+		}
+	}	
 }
 
 
