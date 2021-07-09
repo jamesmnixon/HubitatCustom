@@ -1,9 +1,11 @@
 # HubitatCustom
 
+This set of drivers is being re-written for version 2.2.8 of Hubitat.  It will (eventually) be found as a set of device-independent library modules to be located here: https://github.com/jvmahon/HubitatDriverTools
+
 
 The 1.1.6 release is an almost complete re-write. In this release, the driver learns about a devices capabilities in one of two ways: 
 1. There's an existing database of devices stored in the @Field variable "deviceDatabase" which contains information on devices that I own (Ring G2 Motion sensor, Zooz ZSE18 / Zen25 / Zen26 / Zen30, HomeSeer WD100 / WS100 / WD200 / WS200, Jasco 46201, GE Heavy Duty Switch 14285, Inovelli LZW36). If you have one of those, its in the database.
-2. If your device isn't in the deviceDatabase, its information gets pulled from oepnsmarthouse.or and stored in a state variable. 
+2. If your device isn't in the deviceDatabase, its information gets pulled from opensmarthouse.or and stored in a state variable. 
 
 I'll document how this all works at some point.
 
