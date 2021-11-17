@@ -263,7 +263,7 @@ Map getThisDeviceDataRecord(){
 }
 
 Map getDeviceInputs()  { 
-	Map returnMe = dataRecordByProduct?.deviceRecord?.deviceInputs.sort({it.key})
+	Map returnMe = dataRecordByProduct?.deviceRecord?.deviceInputs?.sort({it.key})
 	if (logEnable && returnMe.is( null ) ) log.warn "Device ${device.displayName}: Device has no inputs. Check if device was initialized. returnMe is ${returnMe}."
 	return returnMe
 }
@@ -778,7 +778,7 @@ Map<Integer, BigInteger> getParameterValuesFromDevice()
 	
 	ConcurrentHashMap inputs = getDeviceInputs()	
 	
-	log.debug "In function getParameterValuesFromDevice, parameter values are: ${parameterValues}. Size is: ${parameterValues.size()}. Inputs size is ${inputs.size()}."
+	log.debug "In function getParameterValuesFromDevice, parameter values are: ${parameterValues}. Size is: ${parameterValues.size()}. Inputs size is ${inputs?.size()}."
 	
 	if (!inputs) return null
 
