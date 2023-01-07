@@ -1683,10 +1683,14 @@ Map createInputControls(data)
 	Map inputControls = [:]	
 	data?.each
 	{
-		if (it.read_only as Integer) {
-				log.info "Device ${device.displayName}: Parameter ${it.param_id}-${it.label} is read-only. No input control created."
-				return
+		try{ // try/catch to handle the possible 'empty string' value
+		    if (it.read_only as Integer) {
+			    log.info "Device ${device.displayName}: Parameter ${it.param_id}-${it.label} is read-only. No input control created."
+			    return
 			}
+		} catch (NumberFormatException e) {
+		    log.error "Device ${device.displayName}: Parameter ${it.param_id}-${it.label} is empty. Treating as not read_only. - Rely on your user manual for proper values!."
+		}
 	
 		if (it.bitmask.toInteger())
 		{
